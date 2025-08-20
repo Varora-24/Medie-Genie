@@ -1,0 +1,225 @@
+:root {
+  --primary-color: #0077be;
+  --secondary-color: #43a047;
+  --accent-color: #ffd600;
+  --background-color: #f0f4f8;
+  --text-color: #333333;
+  --heading-color: #4a90e2;
+  --medi-genie-text-color: #0077be; /* Blue color for Medi-Genie text */
+  --card-bg-color: #ffffff;
+  --card-text-color: #424242;
+  --hover-color: #ffd700; /* Yellow */
+  --error-color: #d32f2f;
+  --success-color: #388e3c;
+  --input-bg-color: #f0f0f0;
+  --input-text-color: #000000;
+}
+
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-family: 'Inter', sans-serif;
+  transition: all 0.3s ease;
+  position: relative;
+  background-image: url("https://www.transparenttextures.com/patterns/medical-icons.png");
+  /* This pattern is from TransparentTextures.com */
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading-color);
+  font-weight: bold;
+  transition: color 0.3s ease;
+}
+
+.logo {
+  width: 50px;
+  height: 50px;
+  filter: invert(23%) sepia(94%) saturate(1957%) hue-rotate(190deg) brightness(94%) contrast(101%);
+  transition: filter 0.3s ease;
+}
+
+.nav-link {
+  color: var(--primary-color);
+  transition: color 0.3s ease, transform 0.2s ease;
+  font-weight: 600;
+}
+
+.nav-link:hover {
+  color: var(--hover-color);
+  transform: translateY(-2px);
+}
+
+.card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background-color: var(--card-bg-color);
+  color: var(--card-text-color);
+  border: 1px solid #e0e0e0;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.card-title {
+  color: var(--primary-color);
+  transition: color 0.3s ease;
+}
+
+.card-description {
+  color: #4a4a4a;
+  transition: color 0.3s ease;
+}
+
+.button {
+  background-color: var(--primary-color);
+  color: white;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-weight: 600;
+}
+
+.button:hover {
+  background-color: var(--hover-color);
+  transform: translateY(-2px);
+}
+
+.accent-bg {
+  background-color: var(--accent-color);
+  color: var(--text-color);
+  transition: background-color 0.3s ease;
+}
+
+.secondary-bg {
+  background-color: var(--secondary-color);
+  color: white;
+  transition: background-color 0.3s ease;
+}
+
+.error-text {
+  color: var(--error-color);
+  transition: color 0.3s ease;
+}
+
+.success-text {
+  color: var(--success-color);
+  transition: color 0.3s ease;
+}
+
+.icon {
+  width: 48px;
+  height: 48px;
+  transition: transform 0.3s ease;
+}
+
+.icon:hover {
+  transform: scale(1.1);
+}
+
+.section-heading {
+  font-size: 2.5rem;
+  color: var(--heading-color);
+  text-align: center;
+  margin-bottom: 1.5rem;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+input, textarea, select {
+  background-color: var(--input-bg-color);
+  color: var(--input-text-color);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+  box-shadow: 0 0 0 2px var(--primary-color);
+}
+
+.section {
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+  margin-bottom: 2rem;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.section:hover {
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-3px);
+}
+
+
+/* Media Queries */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 1rem;
+  }
+
+  .card {
+    margin-bottom: 1rem;
+  }
+
+  .section-heading {
+    font-size: 2rem;
+  }
+
+  .icon {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo {
+    width: 40px;
+    height: 40px;
+  }
+
+  .nav-link {
+    font-size: 0.9rem;
+  }
+
+  .button {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .section-heading {
+    font-size: 1.75rem;
+  }
+
+  .icon {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* Dark mode styles */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background-color: #1a1a1a;
+    --text-color: #f0f0f0;
+    --heading-color: #6ab7ff;
+    --card-bg-color: #2a2a2a;
+    --card-text-color: #e0e0e0;
+    --input-bg-color: #333333;
+    --input-text-color: #ffffff;
+  }
+
+  .logo {
+    filter: invert(100%);
+  }
+
+  .section {
+    background-color: #2a2a2a;
+  }
+  body::before {
+    background-color: rgba(0, 0, 0, 0.7);
+  }
+}
+
+* {
+  min-height: 0;
+  min-width: 0;
+}
+
