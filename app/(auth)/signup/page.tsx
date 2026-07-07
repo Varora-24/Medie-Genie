@@ -25,7 +25,7 @@ export default function SignupPage() {
         setErrors(res.error)
         
         // Show toasts for specific errors
-        if (res.error.global) {
+        if ('global' in res.error && res.error.global) {
           toast.error(res.error.global[0])
         } else {
           toast.error('Please correct the validation errors below.')

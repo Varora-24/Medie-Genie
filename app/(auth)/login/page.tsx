@@ -23,7 +23,7 @@ export default function LoginPage() {
 
       if (res?.error) {
         setErrors(res.error)
-        if (res.error.global) {
+        if ('global' in res.error && res.error.global) {
           toast.error(res.error.global[0])
         } else {
           toast.error('Invalid credentials. Please check your inputs.')
