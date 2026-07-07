@@ -1,0 +1,125 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String
+  role          String    @default("patient") // "patient" | "doctor" | "admin"
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  appointmentsAsPatient Appointment[] @relation("PatientAppointments")
+  appointmentsAsDoctor  Appointment[] @relation("DoctorAppointments")
+  prescriptionsAsPatient Prescription[] @relation("PatientPrescriptions")
+  prescriptionsAsDoctor  Prescription[] @relation("DoctorPrescriptions")
+  medicalRecordsAsPatient MedicalRecord[] @relation("PatientRecords")
+  medicalRecordsAsDoctor  MedicalRecord[] @relation("DoctorRecords")
+  reminders             Reminder[]
+  chatSessions          ChatSession[]
+  payments              Payment[]
+}
+
+model Appointment {
+  id        String   @id @default(cuid())
+  patientId String
+  patient   User     @relation("PatientAppointments", fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId  String
+  doctor    User     @relation("DoctorAppointments", fields: [doctorId], references: [id], onDelete: Cascade)
+  dateTime  DateTime
+  status    String   @default("PENDING") // "PENDING" | "CONFIRMED" | "CANCELLED"
+  reason    String
+  notes     String?
+  payments  Payment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Prescription {
+  id           String   @id @default(cuid())
+  patientId    String
+  patient      User     @relation("PatientPrescriptions", fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId     String
+  doctor       User     @relation("DoctorPrescriptions", fields: [doctorId], references: [id], onDelete: Cascade)
+  medication   String
+  dosage       String
+  frequency    String
+  startDate    DateTime
+  endDate      DateTime
+  instructions String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model MedicalRecord {
+  id          String   @id @default(cuid())
+  patientId   String
+  patient     User     @relation("PatientRecords", fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId    String
+  doctor      User     @relation("DoctorRecords", fields: [doctorId], references: [id], onDelete: Cascade)
+  type        String   // "LAB_RESULT" | "DIAGNOSIS" | "IMMUNIZATION" | "REFERRAL"
+  title       String
+  description String?
+  fileUrl     String?
+  recordDate  DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Reminder {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  content      String?
+  type         String   // "MEDICATION" | "APPOINTMENT" | "GENERAL"
+  scheduleTime DateTime
+  isCompleted  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  patientId String
+  patient   User          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  title     String
+  messages  ChatMessage[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model ChatMessage {
+  id         String      @id @default(cuid())
+  sessionId  String
+  session    ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  senderRole String      // "PATIENT" | "AI"
+  content    String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model Payment {
+  id                String       @id @default(cuid())
+  patientId         String
+  patient           User         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointmentId     String?
+  appointment       Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  amount            Float
+  currency          String       @default("USD")
+  status            String       @default("PENDING") // "PENDING" | "COMPLETED" | "FAILED"
+  provider          String?      // e.g. "STRIPE"
+  providerPaymentId String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
