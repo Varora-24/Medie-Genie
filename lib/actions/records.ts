@@ -5,7 +5,7 @@ import { auth } from '@/auth'
 import { revalidatePath } from 'next/cache'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://huednspoofanbpkiumvf.supabase.co'
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
 export async function getMedicalRecords() {
   const session = await auth()
@@ -45,9 +45,9 @@ export async function uploadMedicalRecord(formData: FormData) {
   }
 
   try {
-    // 1. Upload file to Supabase Storage via REST API
+    // 1. Upload file to Supabase Storage via REST API (prefixed with patient's userId)
     const fileExtension = file.name.split('.').pop() || 'dat'
-    const uniqueFilename = `${userId}_${Date.now()}.${fileExtension}`
+    const uniqueFilename = `${userId}/${Date.now()}.${fileExtension}`
     const uploadUrl = `${SUPABASE_URL}/storage/v1/object/medical-records/${uniqueFilename}`
 
     const arrayBuffer = await file.arrayBuffer()
@@ -56,8 +56,8 @@ export async function uploadMedicalRecord(formData: FormData) {
     const uploadResponse = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'apikey': SUPABASE_KEY,
         'Content-Type': file.type || 'application/octet-stream',
       },
       body: buffer,
