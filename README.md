@@ -1,8 +1,9 @@
 # Medie Genie — AI-Assisted Patient Portal
 
-Medie Genie is a secure, HIPAA-compliant patient portal that simplifies clinical scheduling, medical history tracking, prescription management, and uses AI for intelligent symptom triage.
+🚧 **Project Status: Under Active Development** (Phase 2: Patient Portal Core)
+- **Live URL**: [https://medie-genie-patient-portal.vercel.app](https://medie-genie-patient-portal.vercel.app) *(Refer to Vercel Deploy Guide below)*
 
-This repository contains the rebuilt-from-scratch Next.js application, eliminating fake mock services and establishing a production-grade codebase with real authentication, database modeling, and route security.
+Medie Genie is a secure, HIPAA-compliant patient portal that simplifies clinical scheduling, medical history tracking, prescription management, and uses AI for intelligent symptom triage.
 
 ---
 
@@ -56,19 +57,25 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ---
 
 ## 🗺️ Roadmap
-- **Phase 1: Foundation (Current)**:
+- **Phase 1: Foundation (Completed)**:
   - Database schema & Prisma v6 bindings.
   - Safe Credentials Auth with NextAuth v5 and bcryptjs.
   - Responsive marketing landing page and role-aware dashboard layout.
-- **Phase 2: Patient Portal Features**:
-  - Appointment booking scheduler.
-  - Patient prescriptions viewer & doctor renewal requests.
-  - Medical record uploads (secure storage integration).
-  - Reminders scheduler.
-- **Phase 3: AI symptom Chatbot**:
+- **Phase 2: Patient Portal Features (Completed)**:
+  - Appointment booking scheduler (linked to PostgreSQL database).
+  - Patient prescriptions viewer (real-time query filtered by patient ID).
+  - Medical record uploads (secure file uploads direct to Supabase Storage).
+  - Medication & clinical reminders scheduler (full CRUD).
+
+---
+
+## 🔮 Future Scope
+- **AI Symptom Chatbot (Phase 3)**:
   - Integration with health API LLMs (e.g. OpenAI / Gemini) for secure, conversational triage advice.
-- **Phase 4: Dashboard Upgrades & Payments**:
+- **Dashboard Upgrades & Payments (Phase 4)**:
   - Doctor notes module.
   - Stripe payments integration.
   - Admin management views.
-  - Production deployment (Vercel/Supabase).
+- **Additional Enhancements**:
+  - Email/SMS reminder notifications.
+  - Video consultation support.
