@@ -1,7 +1,7 @@
 # Medie Genie — AI-Assisted Patient Portal
 
 🚧 **Project Status: Under Active Development** (Phase 2: Patient Portal Core)
-- **Live URL**: [https://medie-genie-patient-portal.vercel.app](https://medie-genie-patient-portal.vercel.app) *(Refer to Vercel Deploy Guide below)*
+- **Live URL**: [https://medie-genie.vercel.app](https://medie-genie.vercel.app)
 
 Medie Genie is a secure, HIPAA-compliant patient portal that simplifies clinical scheduling, medical history tracking, prescription management, and uses AI for intelligent symptom triage.
 
