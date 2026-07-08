@@ -10,9 +10,8 @@ export async function signUpAction(prevState: any, formData: FormData) {
   const name = formData.get('name') as string
   const email = formData.get('email') as string
   const password = formData.get('password') as string
-  const role = formData.get('role') as string
 
-  const validatedFields = SignupSchema.safeParse({ name, email, password, role })
+  const validatedFields = SignupSchema.safeParse({ name, email, password })
 
   if (!validatedFields.success) {
     return {
@@ -35,7 +34,7 @@ export async function signUpAction(prevState: any, formData: FormData) {
         name,
         email,
         password: hashedPassword,
-        role,
+        role: 'patient',
       },
     })
 

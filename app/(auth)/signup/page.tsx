@@ -124,29 +124,6 @@ export default function SignupPage() {
               )}
             </div>
 
-            {/* Role selection */}
-            <div>
-              <label htmlFor="role" className="block text-sm font-semibold text-slate-700">
-                Register As
-              </label>
-              <div className="mt-1">
-                <select
-                  id="role"
-                  name="role"
-                  required
-                  defaultValue="patient"
-                  className="block w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white transition-all outline-none"
-                >
-                  <option value="patient">Patient</option>
-                  <option value="doctor">Medical Doctor</option>
-                  <option value="admin">Administrator</option>
-                </select>
-              </div>
-              {errors.role && (
-                <p className="mt-1 text-xs text-rose-600">{errors.role[0]}</p>
-              )}
-            </div>
-
             {/* Submit Button */}
             <div>
               <button
