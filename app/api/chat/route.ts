@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import db from '@/lib/db'
 import { auth } from '@/auth'
 
@@ -157,41 +157,47 @@ export async function POST(req: NextRequest) {
       select: { senderRole: true, content: true },
     })
 
-    const anthropicMessages: Array<{ role: 'user' | 'assistant'; content: string }> = history.map(
-      (msg) => ({
-        role: msg.senderRole === 'PATIENT' ? ('user' as const) : ('assistant' as const),
-        content: msg.content,
-      })
-    )
+    // Convert history to Gemini format. (Ignore the current patient message we just saved, we'll send it as the prompt)
+    // Wait, if we just saved it, it's in the `history`. Let's pop it off, or just pass history except the last one, and send the last one as the main message.
+    // Actually, `chat.sendMessage(msg)` takes the history up to the message, then the new message.
+    const historyExceptLast = history.slice(0, -1).map((msg) => ({
+      role: msg.senderRole === 'PATIENT' ? 'user' : 'model',
+      parts: [{ text: msg.content }],
+    }))
 
-    // 8. Call Anthropic API
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    // 8. Call Gemini API
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3.5-flash',
+      systemInstruction: SYSTEM_PROMPT,
+    })
 
     let aiReplyText: string
     try {
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-5',
-        max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        messages: anthropicMessages,
+      const chat = model.startChat({
+        history: historyExceptLast,
+        generationConfig: {
+          maxOutputTokens: 1024,
+        },
       })
 
-      // Extract text from response
-      const textBlock = response.content.find((block) => block.type === 'text')
-      aiReplyText = textBlock ? textBlock.text : 'I was unable to generate a response. Please try again.'
+      const result = await chat.sendMessage(trimmedMessage)
+      aiReplyText = result.response.text()
     } catch (apiError: any) {
-      console.error('Anthropic API error:', apiError)
+      console.error('Gemini API error:', apiError)
 
-      // Return a clear error — the frontend will show a friendly message
-      // and preserve the user's typed input
-      return NextResponse.json(
-        {
-          error:
-            'The AI service is temporarily unavailable. Please try again in a moment.',
-          sessionId: chatSessionId,
-        },
-        { status: 502 }
-      )
+      // Handle Gemini safety blocks specifically (if it throws due to safety filters)
+      if (apiError.message?.includes('SAFETY')) {
+         aiReplyText = "I apologize, but I cannot fulfill this request due to safety guidelines. Please consult a healthcare professional for medical advice."
+      } else {
+         return NextResponse.json(
+           {
+             error: 'The AI service is temporarily unavailable. Please try again in a moment.',
+             sessionId: chatSessionId,
+           },
+           { status: 502 }
+         )
+      }
     }
 
     // 9. Determine flagged status
