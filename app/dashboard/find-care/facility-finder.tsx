@@ -4,18 +4,12 @@ import React, { useState, useEffect } from 'react'
 import { MapPin, Navigation, Search, Loader2, AlertCircle, Building2, ExternalLink, ShieldAlert } from 'lucide-react'
 
 interface Facility {
-  id: number
-  lat: number
-  lon: number
-  tags: {
-    name?: string
-    amenity?: string
-    healthcare?: string
-    'addr:street'?: string
-    'addr:city'?: string
-    'addr:postcode'?: string
-    emergency?: string
-  }
+  id: string
+  displayName?: { text: string }
+  formattedAddress?: string
+  location: { latitude: number, longitude: number }
+  primaryType?: string
+  types?: string[]
   distance?: number // computed distance in km
 }
 
@@ -86,10 +80,10 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
 
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`)
+      const res = await fetch(`/api/maps/geocode?lat=${lat}&lon=${lon}`)
       const data = await res.json()
-      if (data && data.display_name) {
-        setCurrentAddress(data.display_name)
+      if (res.ok && data.results && data.results.length > 0) {
+        setCurrentAddress(data.results[0].formatted_address)
       } else {
         setCurrentAddress(`${lat.toFixed(4)}, ${lon.toFixed(4)}`)
       }
@@ -106,13 +100,13 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
     setIsGeocoding(true)
     setError(null)
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(manualAddress)}&limit=1`)
+      const res = await fetch(`/api/maps/geocode?address=${encodeURIComponent(manualAddress)}`)
       const data = await res.json()
       
-      if (data && data.length > 0) {
-        const result = data[0]
-        setCoords({ lat: parseFloat(result.lat), lon: parseFloat(result.lon) })
-        setCurrentAddress(result.display_name)
+      if (res.ok && data.results && data.results.length > 0) {
+        const result = data.results[0]
+        setCoords({ lat: result.geometry.location.lat, lon: result.geometry.location.lng })
+        setCurrentAddress(result.formatted_address)
         setGeoDenied(false)
       } else {
         setError("Could not find that location. Please try a more specific address or city.")
@@ -129,51 +123,33 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
     setError(null)
     setFacilities([])
     
-    // In emergency mode, only look for hospitals/clinics, exclude pharmacies/labs
-    const filter = isEmergency
-      ? `node(around:${radiusMeters},${lat},${lon})[amenity~"hospital"];`
-      : `
-        node(around:${radiusMeters},${lat},${lon})[amenity~"hospital|clinic|pharmacy"];
-        node(around:${radiusMeters},${lat},${lon})["healthcare"~"laboratory|clinic"];
-      `
-
-    const query = `
-      [out:json][timeout:25];
-      (
-        ${filter}
-      );
-      out body;
-      >;
-      out skel qt;
-    `
-
     try {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 15000)
 
-      const res = await fetch('https://overpass-api.de/api/interpreter', {
+      const res = await fetch('/api/maps/places', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/json'
         },
-        body: `data=${encodeURIComponent(query)}`,
+        body: JSON.stringify({ lat, lon, radius: radiusMeters, isEmergency }),
         signal: controller.signal
       })
       
       clearTimeout(timeoutId)
 
-      if (!res.ok) {
-        throw new Error('Overpass API returned an error')
-      }
-
       const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Server API returned an error')
+      }
       
-      if (data && data.elements) {
+      if (data.places) {
         // Map and calculate distance
-        const results: Facility[] = data.elements
-          .filter((el: any) => el.tags && (el.tags.name || el.tags.amenity))
-          .map((el: any) => {
-            const dist = getDistanceFromLatLonInKm(lat, lon, el.lat, el.lon)
+        const results: Facility[] = data.places
+          .filter((el: Facility) => el.location)
+          .map((el: Facility) => {
+            const dist = getDistanceFromLatLonInKm(lat, lon, el.location.latitude, el.location.longitude)
             return {
               ...el,
               distance: dist
@@ -183,9 +159,9 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
         // Sort by distance
         results.sort((a, b) => (a.distance || 0) - (b.distance || 0))
         
-        // Remove exact duplicates by name if any (OpenStreetMap can sometimes have multiple nodes for one building)
+        // Remove exact duplicates by ID
         const uniqueResults = results.reduce((acc: Facility[], current) => {
-          const exists = acc.find(item => item.tags.name === current.tags.name && current.tags.name)
+          const exists = acc.find(item => item.id === current.id)
           if (!exists) {
             acc.push(current)
           }
@@ -195,30 +171,23 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
         setFacilities(uniqueResults)
       }
     } catch (err: any) {
-      console.error('Overpass fetch failed', err)
+      console.error('Places fetch failed', err)
       if (err.name === 'AbortError') {
-         setError("The request timed out. The OpenStreetMap public server might be slow right now.")
+         setError("The request timed out. The server might be slow right now.")
       } else {
-         setError("Couldn't load nearby facilities. Please try again or increase the search radius.")
+         setError("Couldn't load nearby facilities. Please try again or check your location settings.")
       }
     } finally {
       setIsLoading(false)
     }
   }
 
-  const formatAddress = (tags: any) => {
-    const parts = []
-    if (tags['addr:street']) parts.push(tags['addr:street'])
-    if (tags['addr:city']) parts.push(tags['addr:city'])
-    if (tags['addr:postcode']) parts.push(tags['addr:postcode'])
-    return parts.length > 0 ? parts.join(', ') : 'Address not listed'
-  }
-
-  const getTypeLabel = (tags: any) => {
-    if (tags.amenity === 'hospital') return 'Hospital'
-    if (tags.amenity === 'pharmacy') return 'Pharmacy'
-    if (tags.amenity === 'clinic') return 'Clinic'
-    if (tags.healthcare === 'laboratory') return 'Laboratory'
+  const getTypeLabel = (fac: Facility) => {
+    const types = fac.types || []
+    if (types.includes('hospital')) return 'Hospital'
+    if (types.includes('pharmacy')) return 'Pharmacy'
+    if (types.includes('medical_clinic')) return 'Clinic'
+    if (types.includes('medical_lab')) return 'Laboratory'
     return 'Medical Facility'
   }
 
@@ -251,9 +220,8 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
               <option value={2000}>2 km</option>
               <option value={5000}>5 km</option>
               <option value={10000}>10 km</option>
-              <option value={20000}>20 km</option>
+              <option value={25000}>25 km</option>
               <option value={50000}>50 km</option>
-              <option value={100000}>100 km</option>
             </select>
           </div>
         </div>
@@ -311,58 +279,58 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
         {isLoading ? (
           <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center flex flex-col items-center justify-center space-y-4">
             <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
-            <p className="text-slate-500 font-medium text-sm">Searching open-source map data for facilities within {radius / 1000}km...</p>
+            <p className="text-slate-500 font-medium text-sm">Searching Google Maps for facilities within {radius / 1000}km...</p>
           </div>
         ) : facilities.length > 0 ? (
-          facilities.map((fac) => (
-            <div key={fac.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition-shadow">
-              
-              <div className="flex items-start gap-4">
-                <div className={`p-3 rounded-2xl flex-shrink-0 mt-1 ${
-                  fac.tags.amenity === 'hospital' ? 'bg-rose-100 text-rose-600' : 
-                  fac.tags.amenity === 'pharmacy' ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'
-                }`}>
-                  <Building2 className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold text-slate-800 text-lg">
-                      {fac.tags.name || 'Unnamed Facility'}
-                    </h3>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
-                      {getTypeLabel(fac.tags)}
-                    </span>
+          facilities.map((fac) => {
+            const types = fac.types || []
+            const isHosp = types.includes('hospital')
+            const isPharm = types.includes('pharmacy')
+            
+            return (
+              <div key={fac.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition-shadow">
+                
+                <div className="flex items-start gap-4">
+                  <div className={`p-3 rounded-2xl flex-shrink-0 mt-1 ${
+                    isHosp ? 'bg-rose-100 text-rose-600' : 
+                    isPharm ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'
+                  }`}>
+                    <Building2 className="h-6 w-6" />
                   </div>
-                  <p className="text-sm text-slate-500 flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {formatAddress(fac.tags)}
-                  </p>
-                  
-                  {fac.tags.emergency === 'yes' && (
-                    <span className="inline-block mt-2 px-2 py-1 bg-red-50 text-red-700 text-xs font-bold rounded border border-red-100">
-                      Emergency Room Available
-                    </span>
-                  )}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-slate-800 text-lg">
+                        {fac.displayName?.text || 'Unnamed Facility'}
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
+                        {getTypeLabel(fac)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-500 flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {fac.formattedAddress || 'Address not listed'}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between gap-2 sm:gap-3 border-t sm:border-t-0 pt-4 sm:pt-0 border-slate-100">
-                <div className="text-sm font-bold text-slate-600 bg-slate-50 px-3 py-1 rounded-lg">
-                  {fac.distance?.toFixed(1)} km away
+                <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between gap-2 sm:gap-3 border-t sm:border-t-0 pt-4 sm:pt-0 border-slate-100">
+                  <div className="text-sm font-bold text-slate-600 bg-slate-50 px-3 py-1 rounded-lg">
+                    {fac.distance?.toFixed(1)} km away
+                  </div>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${fac.location.latitude},${fac.location.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
+                  >
+                    <Navigation className="h-4 w-4" />
+                    Get Directions
+                    <ExternalLink className="h-3.5 w-3.5 ml-1 opacity-70" />
+                  </a>
                 </div>
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${fac.lat},${fac.lon}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
-                >
-                  <Navigation className="h-4 w-4" />
-                  Get Directions
-                  <ExternalLink className="h-3.5 w-3.5 ml-1 opacity-70" />
-                </a>
               </div>
-            </div>
-          ))
+            )
+          })
         ) : (
           coords && !isLoading && !error && (
             <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center text-slate-500">
