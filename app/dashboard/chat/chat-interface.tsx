@@ -11,7 +11,10 @@ import {
   User,
   AlertTriangle,
   ChevronLeft,
+  HeartPulse,
+  Pill
 } from 'lucide-react'
+import Link from 'next/link'
 
 interface ChatSession {
   id: string
@@ -74,7 +77,11 @@ export default function ChatInterface({ initialSessions }: ChatInterfaceProps) {
   }
 
   const handleSend = async () => {
-    const trimmed = input.trim()
+    await sendChatMessage(input)
+  }
+
+  const sendChatMessage = async (text: string) => {
+    const trimmed = text.trim()
     if (!trimmed || isLoading) return
 
     setError(null)
@@ -88,8 +95,7 @@ export default function ChatInterface({ initialSessions }: ChatInterfaceProps) {
       createdAt: new Date(),
     }
     setMessages((prev) => [...prev, optimisticUserMsg])
-    // Do NOT clear input yet — only clear on success
-    const sentText = trimmed
+    // Clear input on submit
     setInput('')
     setIsLoading(true)
 
@@ -98,7 +104,7 @@ export default function ChatInterface({ initialSessions }: ChatInterfaceProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: sentText,
+          message: trimmed,
           sessionId: activeSessionId || undefined,
         }),
       })
@@ -107,7 +113,7 @@ export default function ChatInterface({ initialSessions }: ChatInterfaceProps) {
 
       if (!res.ok) {
         // API error — restore the input so user doesn't lose their message
-        setInput(sentText)
+        setInput(trimmed)
         // Remove the optimistic user message
         setMessages((prev) => prev.filter((m) => m.id !== optimisticUserMsg.id))
         setError(data.error || 'Something went wrong. Please try again.')
@@ -120,7 +126,7 @@ export default function ChatInterface({ initialSessions }: ChatInterfaceProps) {
         // Add to sessions sidebar
         const newSession: ChatSession = {
           id: data.sessionId,
-          title: sentText.length > 50 ? sentText.slice(0, 50) + '…' : sentText,
+          title: trimmed.length > 50 ? trimmed.slice(0, 50) + '…' : trimmed,
           createdAt: new Date(),
           _count: { messages: 2 },
         }
@@ -137,7 +143,7 @@ export default function ChatInterface({ initialSessions }: ChatInterfaceProps) {
       }
       setMessages((prev) => [...prev, aiMsg])
     } catch {
-      setInput(sentText)
+      setInput(trimmed)
       setMessages((prev) => prev.filter((m) => m.id !== optimisticUserMsg.id))
       setError('Network error. Please check your connection and try again.')
     } finally {
@@ -237,7 +243,7 @@ export default function ChatInterface({ initialSessions }: ChatInterfaceProps) {
             </div>
           )}
 
-          {messages.map((msg) => {
+          {messages.map((msg, index) => {
             const isUser = msg.senderRole === 'PATIENT'
             return (
               <div
@@ -283,6 +289,47 @@ export default function ChatInterface({ initialSessions }: ChatInterfaceProps) {
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                   </div>
                 </div>
+
+                {/* Triage action buttons for the last AI message */}
+                {index === messages.length - 1 && !isUser && !isLoading && (
+                  <div className="mt-4 flex flex-col gap-3 ml-9">
+                    {msg.flagged ? (
+                      <div className="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm max-w-[85%] lg:max-w-[70%] space-y-3">
+                        <p className="text-sm text-red-800 font-bold uppercase tracking-wide flex items-center gap-2">
+                          <AlertTriangle className="h-5 w-5" />
+                          Call Emergency Services Immediately
+                        </p>
+                        <p className="text-xs text-red-700 font-medium">
+                          Do not wait. The facility finder below is only for secondary reference.
+                        </p>
+                        <Link
+                          href="/dashboard/find-care?emergency=true"
+                          className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
+                        >
+                          <HeartPulse className="h-4 w-4" />
+                          Find Emergency Rooms Near Me
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 max-w-[85%] lg:max-w-[70%]">
+                        <button
+                          onClick={() => sendChatMessage("Could you suggest some home remedies or general self-care guidance for these symptoms?")}
+                          className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-sm font-semibold rounded-lg transition-colors"
+                        >
+                          <Pill className="h-4 w-4" />
+                          Home Remedy Suggestions
+                        </button>
+                        <Link
+                          href="/dashboard/find-care"
+                          className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-sm font-semibold rounded-lg transition-colors"
+                        >
+                          <HeartPulse className="h-4 w-4" />
+                          Find Medical Care Near Me
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}
