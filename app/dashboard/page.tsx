@@ -11,7 +11,8 @@ import {
   Users,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Navigation
 } from 'lucide-react'
 import { getAppointments } from '@/lib/actions/appointments'
 import { getDoctorPatients } from '@/lib/actions/notes'
@@ -21,8 +22,8 @@ export default async function DashboardPage() {
   const role = (session?.user as any).role || 'patient'
   const userName = session?.user?.name || 'User'
   
-  let appointments = []
-  let patients = []
+  let appointments: any[] = []
+  let patients: any[] = []
   if (role === 'doctor') {
     appointments = await getAppointments()
     patients = await getDoctorPatients()

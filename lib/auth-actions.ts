@@ -2,7 +2,7 @@
 
 import db from './db'
 import bcrypt from 'bcryptjs'
-import { signIn, signOut } from '@/auth'
+import { signIn, signOut, auth } from '@/auth'
 import { AuthError } from 'next-auth'
 import { SignupSchema, LoginSchema } from './auth-schemas'
 
