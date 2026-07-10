@@ -3,7 +3,7 @@
 import React, { useTransition } from 'react'
 import { cancelAppointment } from '@/lib/actions/appointments'
 import { toast } from 'sonner'
-import { Calendar, User, Clock, Trash2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
+import { Calendar, User, Clock, Trash2, CheckCircle2, XCircle, AlertCircle, CreditCard } from 'lucide-react'
 
 interface Appointment {
   id: string
@@ -23,6 +23,28 @@ interface AppointmentListProps {
 
 export default function AppointmentList({ initialAppointments, userRole }: AppointmentListProps) {
   const [isPending, startTransition] = useTransition()
+  const [isPaying, setIsPaying] = React.useState<string | null>(null)
+
+  const handlePay = async (appointmentId: string) => {
+    setIsPaying(appointmentId)
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointmentId })
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        toast.error(data.error || 'Payment initialization failed')
+        setIsPaying(null)
+      }
+    } catch (err) {
+      toast.error('Network error during checkout')
+      setIsPaying(null)
+    }
+  }
 
   const handleCancel = (id: string) => {
     if (!confirm('Are you sure you want to cancel this appointment?')) return
@@ -134,7 +156,7 @@ export default function AppointmentList({ initialAppointments, userRole }: Appoi
               {appt.status.toUpperCase() !== 'CANCELLED' && (
                 <button
                   onClick={() => handleCancel(appt.id)}
-                  disabled={isPending}
+                  disabled={isPending || isPaying === appt.id}
                   title="Cancel Appointment"
                   className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-rose-100 disabled:opacity-50"
                 >
@@ -142,6 +164,19 @@ export default function AppointmentList({ initialAppointments, userRole }: Appoi
                 </button>
               )}
             </div>
+            {/* Pay Now Button row below actions on mobile, or inline on desktop */}
+            {userRole === 'patient' && appt.status.toUpperCase() === 'PENDING' && (
+              <div className="w-full sm:w-auto mt-2 sm:mt-0 flex justify-end">
+                <button
+                  onClick={() => handlePay(appt.id)}
+                  disabled={isPaying === appt.id}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-indigo-200"
+                >
+                  <CreditCard className="h-4 w-4" />
+                  {isPaying === appt.id ? 'Processing...' : 'Pay Now'}
+                </button>
+              </div>
+            )}
           </div>
         )
       })}

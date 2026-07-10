@@ -30,6 +30,7 @@ This list tracks the modules and features intentionally deferred from Phase 1 (F
 ## 💳 Phase 4: Financials & Admin Panel
 - [ ] **Doctor notes module**:
   - Allow medical professionals to leave private, encrypted observations on patient files.
+  - *WARNING: DoctorNote uses application-level encryption (AES-256-GCM) relying on ENCRYPTION_KEY. If the key is lost or rotated without a re-encryption migration, all existing notes become permanently unreadable.*
 - [ ] **Stripe payment processor**:
   - Setup Stripe checkout session API for telemedicine/booking payments.
   - Map status changes directly to `Payment` model.

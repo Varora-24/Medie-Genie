@@ -29,6 +29,8 @@ model User {
   reminders             Reminder[]
   chatSessions          ChatSession[]
   payments              Payment[]
+  notesAsPatient    DoctorNote[]   @relation("PatientNotes")
+  notesAsDoctor     DoctorNote[]   @relation("DoctorNotes")
 }
 
 model Appointment {
@@ -124,4 +126,20 @@ model Payment {
   providerPaymentId String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+}
+
+/// WARNING: The encryptedContent in DoctorNote is encrypted using AES-256-GCM. 
+/// It relies on the ENCRYPTION_KEY environment variable. If the ENCRYPTION_KEY 
+/// is lost or rotated without a re-encryption migration plan, all existing notes 
+/// will become permanently unreadable.
+model DoctorNote {
+  id               String   @id @default(cuid())
+  patientId        String
+  patient          User     @relation("PatientNotes", fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId         String
+  doctor           User     @relation("DoctorNotes", fields: [doctorId], references: [id], onDelete: Cascade)
+  encryptedContent String
+  iv               String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
