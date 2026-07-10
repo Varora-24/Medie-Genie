@@ -7,14 +7,15 @@ import { MapPin } from 'lucide-react'
 export default async function FindCarePage({
   searchParams,
 }: {
-  searchParams: { emergency?: string }
+  searchParams: Promise<{ emergency?: string }>
 }) {
   const session = await auth()
   if (!session?.user) {
     redirect('/login')
   }
 
-  const isEmergency = searchParams.emergency === 'true'
+  const resolvedSearchParams = await searchParams
+  const isEmergency = resolvedSearchParams.emergency === 'true'
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">

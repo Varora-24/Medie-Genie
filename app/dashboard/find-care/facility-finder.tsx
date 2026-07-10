@@ -86,11 +86,7 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
 
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
-        headers: {
-          'User-Agent': 'MedieGenie/1.0'
-        }
-      })
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`)
       const data = await res.json()
       if (data && data.display_name) {
         setCurrentAddress(data.display_name)
@@ -110,11 +106,7 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
     setIsGeocoding(true)
     setError(null)
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(manualAddress)}&limit=1`, {
-        headers: {
-          'User-Agent': 'MedieGenie/1.0'
-        }
-      })
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(manualAddress)}&limit=1`)
       const data = await res.json()
       
       if (data && data.length > 0) {
@@ -162,8 +154,7 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
       const res = await fetch('https://overpass-api.de/api/interpreter', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'MedieGenie/1.0'
+          'Content-Type': 'application/x-www-form-urlencoded'
         },
         body: `data=${encodeURIComponent(query)}`,
         signal: controller.signal
