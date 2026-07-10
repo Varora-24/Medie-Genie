@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useTransition } from 'react'
-import { cancelAppointment } from '@/lib/actions/appointments'
+import { cancelAppointment, updateAppointmentStatus } from '@/lib/actions/appointments'
 import { toast } from 'sonner'
 import { Calendar, User, Clock, Trash2, CheckCircle2, XCircle, AlertCircle, CreditCard } from 'lucide-react'
 
@@ -55,6 +55,17 @@ export default function AppointmentList({ initialAppointments, userRole }: Appoi
         toast.error(result.error)
       } else {
         toast.success('Appointment cancelled successfully.')
+      }
+    })
+  }
+
+  const handleUpdateStatus = (id: string, newStatus: string) => {
+    startTransition(async () => {
+      const result = await updateAppointmentStatus(id, newStatus)
+      if (result?.error) {
+        toast.error(result.error)
+      } else {
+        toast.success(`Appointment marked as ${newStatus.toLowerCase()}.`)
       }
     })
   }
@@ -153,7 +164,7 @@ export default function AppointmentList({ initialAppointments, userRole }: Appoi
                 {appt.status}
               </span>
 
-              {appt.status.toUpperCase() !== 'CANCELLED' && (
+              {appt.status.toUpperCase() !== 'CANCELLED' && appt.status.toUpperCase() !== 'COMPLETED' && (
                 <button
                   onClick={() => handleCancel(appt.id)}
                   disabled={isPending || isPaying === appt.id}
@@ -164,6 +175,38 @@ export default function AppointmentList({ initialAppointments, userRole }: Appoi
                 </button>
               )}
             </div>
+            
+            {/* Doctor Actions */}
+            {userRole === 'doctor' && appt.status.toUpperCase() === 'PENDING' && (
+              <div className="w-full sm:w-auto mt-2 sm:mt-0 flex gap-2 justify-end">
+                <button
+                  onClick={() => handleUpdateStatus(appt.id, 'CONFIRMED')}
+                  disabled={isPending}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => handleUpdateStatus(appt.id, 'CANCELLED')}
+                  disabled={isPending}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
+                >
+                  Decline
+                </button>
+              </div>
+            )}
+            
+            {userRole === 'doctor' && appt.status.toUpperCase() === 'CONFIRMED' && (
+              <div className="w-full sm:w-auto mt-2 sm:mt-0 flex justify-end">
+                <button
+                  onClick={() => handleUpdateStatus(appt.id, 'COMPLETED')}
+                  disabled={isPending}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
+                >
+                  Mark Completed
+                </button>
+              </div>
+            )}
             {/* Pay Now Button row below actions on mobile, or inline on desktop */}
             {userRole === 'patient' && appt.status.toUpperCase() === 'PENDING' && (
               <div className="w-full sm:w-auto mt-2 sm:mt-0 flex justify-end">

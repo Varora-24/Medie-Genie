@@ -46,6 +46,11 @@ export default async function PatientsDirectoryPage() {
                   <div>
                     <div className="font-semibold text-slate-800">{patient.name || 'Unnamed Patient'}</div>
                     <div className="text-sm text-slate-500">{patient.email}</div>
+                    {patient.lastAppointment && (
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        Last Appt: {new Date(patient.lastAppointment).toLocaleDateString()}
+                      </div>
+                    )}
                   </div>
                 </div>
                 

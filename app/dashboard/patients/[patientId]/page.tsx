@@ -5,6 +5,7 @@ import { getPatientNotes } from '@/lib/actions/notes'
 import Link from 'next/link'
 import { ChevronLeft, Lock } from 'lucide-react'
 import NotesForm from './notes-form'
+import PrescriptionForm from './prescription-form'
 
 export default async function PatientFilePage({
   params
@@ -53,8 +54,9 @@ export default async function PatientFilePage({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-6">
           <NotesForm patientId={params.patientId} />
+          <PrescriptionForm patientId={params.patientId} />
         </div>
         
         <div className="lg:col-span-2 space-y-4">

@@ -94,3 +94,35 @@ export async function cancelAppointment(id: string) {
     return { error: error.message || 'Failed to cancel appointment.' }
   }
 }
+
+export async function updateAppointmentStatus(id: string, newStatus: string) {
+  const session = await auth()
+  if (!session?.user) return { error: 'Unauthorized' }
+  const userId = (session.user as any).id
+  const role = (session.user as any).role
+
+  if (role !== 'doctor' && role !== 'admin') {
+    return { error: 'Forbidden: Only doctors can update appointment status.' }
+  }
+
+  try {
+    const appointment = await db.appointment.findUnique({ where: { id } })
+    if (!appointment) return { error: 'Appointment not found.' }
+
+    // Check ownership
+    if (appointment.doctorId !== userId && role !== 'admin') {
+      return { error: 'Unauthorized to update this appointment.' }
+    }
+
+    await db.appointment.update({
+      where: { id },
+      data: { status: newStatus },
+    })
+    revalidatePath('/dashboard/appointments')
+    revalidatePath('/dashboard')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error updating appointment:', error)
+    return { error: error.message || 'Failed to update appointment.' }
+  }
+}

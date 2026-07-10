@@ -82,3 +82,38 @@ export async function loginAction(prevState: any, formData: FormData) {
 export async function logoutAction() {
   await signOut({ redirectTo: '/' })
 }
+
+export async function updateProfile(formData: FormData) {
+  const session = await auth()
+  if (!session?.user) return { error: 'Unauthorized' }
+  const userId = (session.user as any).id
+  
+  const name = formData.get('name') as string
+  const specialty = formData.get('specialty') as string
+
+  if (!name || name.trim() === '') {
+    return { error: 'Name cannot be empty' }
+  }
+
+  try {
+    await db.user.update({
+      where: { id: userId },
+      data: { 
+        name,
+        specialty: specialty || null
+      }
+    })
+    
+    // We ideally would update the session, but NextAuth v5 session strategy is JWT 
+    // so it might take a re-login to reflect name everywhere if it's cached in JWT, 
+    // but we can revalidate the current paths.
+    const { revalidatePath } = await import('next/cache')
+    revalidatePath('/dashboard')
+    revalidatePath('/dashboard/settings')
+    
+    return { success: true }
+  } catch (error) {
+    console.error('Error updating profile:', error)
+    return { error: 'Failed to update profile' }
+  }
+}

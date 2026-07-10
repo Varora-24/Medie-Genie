@@ -5,7 +5,7 @@ import { auth } from '@/auth'
 import { encryptNote, decryptNote } from '@/lib/encryption'
 import { revalidatePath } from 'next/cache'
 
-async function verifyDoctorAccess(doctorId: string, patientId: string) {
+export async function verifyDoctorAccess(doctorId: string, patientId: string) {
   // Check if doctor has any appointment with this patient
   const appointment = await db.appointment.findFirst({
     where: {
@@ -33,13 +33,19 @@ export async function getDoctorPatients() {
   // Find all unique patients this doctor has appointments with
   const appointments = await db.appointment.findMany({
     where: { doctorId: userId },
-    select: { patient: { select: { id: true, name: true, email: true } } }
+    select: { dateTime: true, patient: { select: { id: true, name: true, email: true } } },
+    orderBy: { dateTime: 'desc' }
   })
 
-  // Deduplicate
+  // Deduplicate and keep the most recent appointment date (since it's ordered by desc)
   const patientMap = new Map()
   appointments.forEach(a => {
-    patientMap.set(a.patient.id, a.patient)
+    if (!patientMap.has(a.patient.id)) {
+      patientMap.set(a.patient.id, {
+        ...a.patient,
+        lastAppointment: a.dateTime
+      })
+    }
   })
 
   return Array.from(patientMap.values())
