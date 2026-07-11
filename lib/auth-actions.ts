@@ -22,6 +22,11 @@ export async function signUpAction(prevState: any, formData: FormData) {
   try {
     const existingUser = await db.user.findUnique({ where: { email } })
     if (existingUser) {
+      if (existingUser.authProvider === 'google') {
+        return {
+          error: { email: ['An account with this email already exists. Please continue with Google instead.'] },
+        }
+      }
       return {
         error: { email: ['Email already in use'] },
       }
@@ -35,6 +40,7 @@ export async function signUpAction(prevState: any, formData: FormData) {
         email,
         password: hashedPassword,
         role: 'patient',
+        authProvider: 'credentials',
       },
     })
 
@@ -77,6 +83,10 @@ export async function loginAction(prevState: any, formData: FormData) {
     }
     throw error
   }
+}
+
+export async function googleLoginAction() {
+  await signIn('google', { redirectTo: '/dashboard' })
 }
 
 export async function logoutAction() {
