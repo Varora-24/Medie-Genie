@@ -13,7 +13,8 @@ import {
   Users,
   Settings,
   LogOut,
-  User
+  User,
+  CreditCard
 } from 'lucide-react'
 import NotificationBell from '@/components/notification-bell'
 
