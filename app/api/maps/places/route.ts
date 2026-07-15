@@ -8,12 +8,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY
-  if (!apiKey) {
-    console.error('Missing GOOGLE_MAPS_API_KEY')
-    return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 })
-  }
-
   try {
     const { lat, lon, radius, isEmergency } = await req.json()
 
@@ -21,47 +15,80 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 })
     }
 
-    // Determine types to search
-    // Using Places API (New) supported types
-    // https://developers.google.com/maps/documentation/places/web-service/supported_types
-    const includedTypes = isEmergency
-      ? ['hospital']
-      : ['hospital', 'pharmacy', 'medical_clinic', 'medical_lab']
-
-    const requestBody = {
-      includedTypes,
-      maxResultCount: 20,
-      locationRestriction: {
-        circle: {
-          center: {
-            latitude: lat,
-            longitude: lon
-          },
-          radius: radius // in meters
-        }
+    // Build Overpass QL query
+    let query = `[out:json][timeout:15];\n(\n`
+    
+    if (isEmergency) {
+      query += `  node["amenity"="hospital"](around:${radius},${lat},${lon});\n`
+      query += `  way["amenity"="hospital"](around:${radius},${lat},${lon});\n`
+    } else {
+      const amenities = ['hospital', 'pharmacy', 'clinic', 'doctors']
+      for (const am of amenities) {
+        query += `  node["amenity"="${am}"](around:${radius},${lat},${lon});\n`
+        query += `  way["amenity"="${am}"](around:${radius},${lat},${lon});\n`
       }
+      query += `  node["healthcare"="laboratory"](around:${radius},${lat},${lon});\n`
+      query += `  way["healthcare"="laboratory"](around:${radius},${lat},${lon});\n`
     }
+    
+    query += `);\nout center 30;` // limit to 30 results for speed
 
-    const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+    const response = await fetch('https://overpass-api.de/api/interpreter', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': apiKey,
-        // Request only the fields we need to save bandwidth and billing costs
-        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.types'
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'MedieGenie/1.0 (officialvansh626@gmail.com)'
       },
-      body: JSON.stringify(requestBody)
+      body: `data=${encodeURIComponent(query)}`
     })
 
     const data = await response.json()
 
     if (!response.ok) {
-      console.error('Google Places API Error:', data.error)
-      throw new Error(data.error?.message || 'Failed to fetch places')
+      console.error('Overpass API Error:', data)
+      throw new Error('Failed to fetch places from Overpass API')
     }
 
-    // Google API returns an object with a `places` array if there are results
-    return NextResponse.json({ places: data.places || [] })
+    const places = data.elements.map((el: any) => {
+      // Determine type
+      let primaryType = 'medical_facility'
+      const types = []
+      const tags = el.tags || {}
+      
+      if (tags.amenity === 'hospital') { types.push('hospital'); primaryType = 'hospital' }
+      if (tags.amenity === 'pharmacy') { types.push('pharmacy'); primaryType = 'pharmacy' }
+      if (tags.amenity === 'clinic' || tags.amenity === 'doctors') { types.push('medical_clinic'); primaryType = 'medical_clinic' }
+      if (tags.healthcare === 'laboratory') { types.push('medical_lab'); primaryType = 'medical_lab' }
+
+      // Construct address
+      const addrParts = []
+      if (tags['addr:housenumber'] && tags['addr:street']) {
+        addrParts.push(`${tags['addr:housenumber']} ${tags['addr:street']}`)
+      } else if (tags['addr:street']) {
+        addrParts.push(tags['addr:street'])
+      }
+      if (tags['addr:city']) addrParts.push(tags['addr:city'])
+      
+      const formattedAddress = addrParts.length > 0 ? addrParts.join(', ') : ''
+
+      return {
+        id: el.id.toString(),
+        displayName: {
+          text: tags.name || 'Unnamed Facility'
+        },
+        formattedAddress,
+        location: {
+          latitude: el.lat || el.center?.lat,
+          longitude: el.lon || el.center?.lon
+        },
+        primaryType,
+        types,
+        phone: tags.phone || tags['contact:phone'] || null,
+        openingHours: tags.opening_hours || null
+      }
+    })
+
+    return NextResponse.json({ places })
 
   } catch (error) {
     console.error('Places proxy error:', error)

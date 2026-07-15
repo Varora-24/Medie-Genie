@@ -13,36 +13,63 @@ export async function GET(req: NextRequest) {
   const lon = searchParams.get('lon')
   const address = searchParams.get('address')
   
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY
-  if (!apiKey) {
-    console.error('Missing GOOGLE_MAPS_API_KEY')
-    return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 })
-  }
-
   try {
     let url = ''
+    let isReverse = false
+    
     if (lat && lon) {
       // Reverse geocoding
-      url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${apiKey}`
+      url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`
+      isReverse = true
     } else if (address) {
       // Forward geocoding
-      url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
+      url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`
     } else {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 })
     }
 
-    const response = await fetch(url)
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'MedieGenie/1.0 (officialvansh626@gmail.com)'
+      }
+    })
     const data = await response.json()
 
-    if (data.status !== 'OK') {
-      if (data.status === 'ZERO_RESULTS') {
-         return NextResponse.json({ results: [] })
-      }
-      console.error('Google Geocoding API Error:', data.status, data.error_message)
-      throw new Error(`Google API returned status: ${data.status}`)
+    if (!response.ok) {
+      console.error('Nominatim API Error:', data)
+      throw new Error('Nominatim API returned an error')
     }
 
-    return NextResponse.json({ results: data.results })
+    // Standardize output to match existing frontend expectations (similar to Google results)
+    let results = []
+    
+    if (isReverse) {
+      if (data && !data.error) {
+        results.push({
+          formatted_address: data.display_name,
+          geometry: {
+            location: {
+              lat: parseFloat(data.lat),
+              lng: parseFloat(data.lon)
+            }
+          }
+        })
+      }
+    } else {
+      if (Array.isArray(data) && data.length > 0) {
+        results.push({
+          formatted_address: data[0].display_name,
+          geometry: {
+            location: {
+              lat: parseFloat(data[0].lat),
+              lng: parseFloat(data[0].lon)
+            }
+          }
+        })
+      }
+    }
+
+    return NextResponse.json({ results })
   } catch (error) {
     console.error('Geocoding proxy error:', error)
     return NextResponse.json(

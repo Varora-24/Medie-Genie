@@ -11,6 +11,8 @@ interface Facility {
   primaryType?: string
   types?: string[]
   distance?: number // computed distance in km
+  phone?: string | null
+  openingHours?: string | null
 }
 
 interface FacilityFinderProps {
@@ -40,6 +42,7 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
   
   const [radius, setRadius] = useState<number>(5000) // 5km default
   const [facilities, setFacilities] = useState<Facility[]>([])
+  const [filterType, setFilterType] = useState<string>('all')
   
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -191,6 +194,11 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
     return 'Medical Facility'
   }
 
+  const filteredFacilities = facilities.filter(fac => {
+    if (filterType === 'all') return true
+    return fac.types?.includes(filterType)
+  })
+
   return (
     <div className="space-y-6">
       {/* 1. Header Control Bar */}
@@ -222,6 +230,21 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
               <option value={10000}>10 km</option>
               <option value={25000}>25 km</option>
               <option value={50000}>50 km</option>
+            </select>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-semibold text-slate-700 whitespace-nowrap">Type:</label>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All Facilities</option>
+              <option value="hospital">Hospitals</option>
+              <option value="pharmacy">Pharmacies</option>
+              <option value="medical_clinic">Clinics</option>
+              <option value="medical_lab">Laboratories</option>
             </select>
           </div>
         </div>
@@ -279,10 +302,10 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
         {isLoading ? (
           <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center flex flex-col items-center justify-center space-y-4">
             <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
-            <p className="text-slate-500 font-medium text-sm">Searching Google Maps for facilities within {radius / 1000}km...</p>
+            <p className="text-slate-500 font-medium text-sm">Searching OpenStreetMap for facilities within {radius / 1000}km...</p>
           </div>
-        ) : facilities.length > 0 ? (
-          facilities.map((fac) => {
+        ) : filteredFacilities.length > 0 ? (
+          filteredFacilities.map((fac) => {
             const types = fac.types || []
             const isHosp = types.includes('hospital')
             const isPharm = types.includes('pharmacy')
@@ -306,10 +329,22 @@ export default function FacilityFinder({ isEmergency = false }: FacilityFinderPr
                         {getTypeLabel(fac)}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-500 flex items-center gap-1.5">
+                    <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-2">
                       <MapPin className="h-3.5 w-3.5" />
                       {fac.formattedAddress || 'Address not listed'}
                     </p>
+                    {fac.phone && (
+                      <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                        <a href={`tel:${fac.phone.replace(/[^\d+]/g, '')}`} className="hover:text-indigo-600 hover:underline">{fac.phone}</a>
+                      </p>
+                    )}
+                    {fac.openingHours && (
+                      <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        {fac.openingHours}
+                      </p>
+                    )}
                   </div>
                 </div>
 
