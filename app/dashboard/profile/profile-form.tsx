@@ -7,11 +7,14 @@ import { Save, Loader2, User } from 'lucide-react'
 
 interface ProfileFormProps {
   initialName: string
+  initialEmail: string
+  initialPhone: string
+  initialDateOfBirth: string
   initialSpecialty: string
   role: string
 }
 
-export default function ProfileForm({ initialName, initialSpecialty, role }: ProfileFormProps) {
+export default function ProfileForm({ initialName, initialEmail, initialPhone, initialDateOfBirth, initialSpecialty, role }: ProfileFormProps) {
   const [isPending, startTransition] = useTransition()
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -43,6 +46,50 @@ export default function ProfileForm({ initialName, initialSpecialty, role }: Pro
             required
             className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
           />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-slate-700 mb-2">
+          Email Address
+        </label>
+        <div className="relative">
+          <input
+            type="email"
+            value={initialEmail}
+            disabled
+            className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 cursor-not-allowed"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            Phone Number
+          </label>
+          <div className="relative">
+            <input
+              type="tel"
+              name="phone"
+              defaultValue={initialPhone}
+              placeholder="(555) 123-4567"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            Date of Birth
+          </label>
+          <div className="relative">
+            <input
+              type="date"
+              name="dateOfBirth"
+              defaultValue={initialDateOfBirth}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+            />
+          </div>
         </div>
       </div>
 

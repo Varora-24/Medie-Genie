@@ -20,6 +20,26 @@ export async function getReminders() {
   }
 }
 
+export async function getDueReminders() {
+  const session = await auth()
+  if (!session?.user) return []
+  const userId = (session.user as any).id
+
+  try {
+    return await db.reminder.findMany({
+      where: { 
+        userId,
+        isCompleted: false,
+        scheduleTime: { lte: new Date() }
+      },
+      orderBy: { scheduleTime: 'asc' },
+    })
+  } catch (error) {
+    console.error('Error fetching due reminders:', error)
+    return []
+  }
+}
+
 export async function createReminder(formData: FormData) {
   const session = await auth()
   if (!session?.user) return { error: 'Unauthorized' }

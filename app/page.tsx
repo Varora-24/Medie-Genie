@@ -42,6 +42,7 @@ export default async function LandingPage() {
           <nav className="hidden md:flex gap-8 text-sm font-medium text-slate-500">
             <a href="#features" className="hover:text-slate-900 transition-colors">Features</a>
             <a href="#security" className="hover:text-slate-900 transition-colors">Security</a>
+            <Link href="/apply-doctor" className="hover:text-indigo-600 transition-colors">For Doctors</Link>
           </nav>
 
           <div className="flex items-center gap-3">

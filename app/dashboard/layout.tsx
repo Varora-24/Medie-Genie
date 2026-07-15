@@ -12,10 +12,10 @@ import {
   Bell,
   Users,
   Settings,
-  CreditCard,
   LogOut,
   User
 } from 'lucide-react'
+import NotificationBell from '@/components/notification-bell'
 
 export default async function DashboardLayout({
   children,
@@ -40,7 +40,7 @@ export default async function DashboardLayout({
           { name: 'Console Logs', href: '/dashboard', icon: LayoutDashboard },
           { name: 'User Directory', href: '/dashboard/users', icon: Users },
           { name: 'Financials', href: '/dashboard/payments', icon: CreditCard },
-          { name: 'Portal Settings', href: '/dashboard/settings', icon: Settings },
+          { name: 'Account Settings', href: '/dashboard/profile', icon: Settings },
         ]
       case 'doctor':
         return [
@@ -134,6 +134,7 @@ export default async function DashboardLayout({
               <p className="text-xs font-semibold text-slate-700">{userName}</p>
               <p className="text-[10px] text-slate-400 font-medium">{userEmail}</p>
             </div>
+            {role === 'patient' && <NotificationBell />}
             <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600 text-sm">
               {userName.charAt(0).toUpperCase()}
             </div>

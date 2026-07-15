@@ -42,6 +42,9 @@ export default async function SettingsPage() {
         
         <ProfileForm 
           initialName={user.name || ''} 
+          initialEmail={user.email || ''}
+          initialPhone={user.phone || ''}
+          initialDateOfBirth={user.dateOfBirth ? user.dateOfBirth.toISOString().split('T')[0] : ''}
           initialSpecialty={user.specialty || ''} 
           role={role} 
         />

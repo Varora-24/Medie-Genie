@@ -8,6 +8,7 @@ import { z } from 'zod'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  trustHost: true,
   providers: [
     Google,
     Credentials({
@@ -50,12 +51,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         
         if (existingUser) {
           if (existingUser.authProvider === 'credentials') {
+            if (existingUser.role === 'doctor' || existingUser.role === 'admin') {
+              // Allow Google linking for approved doctors/admins
+              return true
+            }
+            // Block patients who signed up with credentials
             return '/login?error=CredentialsAccountExists'
           }
           return true
         }
 
-        // Create new user for Google sign in
+        // Check if intent is 'doctor' for new Google sign in
+        const { cookies } = await import('next/headers')
+        const cookieStore = await cookies()
+        const intent = cookieStore.get('login_intent')?.value
+        
+        if (intent === 'doctor') {
+          // If they don't have an existing approved account, redirect to application
+          const nameParam = encodeURIComponent(user.name || '')
+          const emailParam = encodeURIComponent(email)
+          return `/apply-doctor?name=${nameParam}&email=${emailParam}`
+        }
+
+        // Create new user for regular patient Google sign in
         await db.user.create({
           data: {
             email,

@@ -102,7 +102,7 @@ function LoginForm() {
           {(activeTab === 'doctor' || activeTab === 'admin') && (
             <div className="mb-6 rounded-lg bg-indigo-50 p-4 border border-indigo-100 text-sm text-indigo-800">
               {activeTab === 'doctor' ? (
-                <p>New doctors must apply and be approved. Contact <a href="mailto:officialvansh626@gmail.com" className="font-semibold underline">officialvansh626@gmail.com</a> with questions.</p>
+                <p>New doctors must apply and be approved. <Link href="/apply-doctor" className="font-semibold underline text-indigo-700 hover:text-indigo-900">Apply here</Link> to get started.</p>
               ) : (
                 <p>Admin accounts are not self-service. Contact <a href="mailto:officialvansh626@gmail.com" className="font-semibold underline">officialvansh626@gmail.com</a> with your details to request access.</p>
               )}
@@ -170,7 +170,7 @@ function LoginForm() {
             </div>
           </form>
 
-          {activeTab === 'patient' && (
+          {activeTab !== 'admin' && (
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -183,6 +183,7 @@ function LoginForm() {
 
               <div className="mt-6">
                 <form action={googleLoginAction}>
+                  <input type="hidden" name="intent" value={activeTab} />
                   <button
                     type="submit"
                     className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-all"

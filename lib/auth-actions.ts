@@ -85,7 +85,13 @@ export async function loginAction(prevState: any, formData: FormData) {
   }
 }
 
-export async function googleLoginAction() {
+export async function googleLoginAction(formData: FormData) {
+  const intent = formData.get('intent') as string
+  if (intent) {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    cookieStore.set('login_intent', intent, { maxAge: 60 * 5, httpOnly: true, path: '/' })
+  }
   await signIn('google', { redirectTo: '/dashboard' })
 }
 
@@ -99,6 +105,8 @@ export async function updateProfile(formData: FormData) {
   const userId = (session.user as any).id
   
   const name = formData.get('name') as string
+  const phone = formData.get('phone') as string
+  const dateOfBirth = formData.get('dateOfBirth') as string
   const specialty = formData.get('specialty') as string
 
   if (!name || name.trim() === '') {
@@ -110,6 +118,8 @@ export async function updateProfile(formData: FormData) {
       where: { id: userId },
       data: { 
         name,
+        phone: phone || null,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
         specialty: specialty || null
       }
     })
@@ -119,7 +129,7 @@ export async function updateProfile(formData: FormData) {
     // but we can revalidate the current paths.
     const { revalidatePath } = await import('next/cache')
     revalidatePath('/dashboard')
-    revalidatePath('/dashboard/settings')
+    revalidatePath('/dashboard/profile')
     
     return { success: true }
   } catch (error) {
