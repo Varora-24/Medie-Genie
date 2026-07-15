@@ -15,7 +15,8 @@ import {
   Navigation,
   Pill,
   Search,
-  MessageSquare
+  MessageSquare,
+  Bell
 } from 'lucide-react'
 import { getAppointments } from '@/lib/actions/appointments'
 import { getDoctorPatients } from '@/lib/actions/notes'
