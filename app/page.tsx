@@ -368,7 +368,7 @@ export default async function LandingPage() {
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
                   <p className="text-sm text-amber-800 leading-relaxed">
                     <strong>Heads up:</strong> Medie Genie is under active development.
-                    Features like the AI symptom chatbot, email notifications, and
+                    Features like Genie Assist, email notifications, and
                     Stripe payments are on the roadmap but not live yet. We{"'"}re
                     shipping updates weekly.
                   </p>

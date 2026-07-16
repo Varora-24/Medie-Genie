@@ -355,7 +355,7 @@ export default async function DashboardPage() {
                 </Link>
                 <Link href="/dashboard/chat" className="flex items-center gap-3 w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 text-slate-700 text-sm font-semibold rounded-xl transition-colors">
                   <MessageSquare className="h-5 w-5 text-indigo-500" />
-                  AI Symptom Checker
+                  Genie Assist
                 </Link>
               </div>
             </div>

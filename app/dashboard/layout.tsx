@@ -57,7 +57,7 @@ export default async function DashboardLayout({
           { name: 'Appointments', href: '/dashboard/appointments', icon: Calendar },
           { name: 'My Prescriptions', href: '/dashboard/prescriptions', icon: FileSpreadsheet },
           { name: 'Medical History', href: '/dashboard/records', icon: Users },
-          { name: 'AI Symptom Chat', href: '/dashboard/chat', icon: Bot },
+          { name: 'Genie Assist', href: '/dashboard/chat', icon: Bot },
           { name: 'Meds Reminders', href: '/dashboard/reminders', icon: Bell },
         ]
     }

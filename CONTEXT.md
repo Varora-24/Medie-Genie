@@ -271,3 +271,11 @@ npm run dev
 | `62af70c` | **Security**: private bucket + RLS policies + service role key |
 | `d3941cc` | Docs: update README with live Vercel URL |
 | `2d7f6f2` | **Redesign**: complete landing page overhaul |
+
+
+### Phase 9: Genie Assist & File Upload
+- **Renamed** "AI Symptom Chat" to "Genie Assist" across the app (sidebar, dashboard, header, etc.).
+- **Database**: Added "attachmentUrl" to "ChatMessage" model and ran migrations.
+- **Storage**: Created a new private Supabase bucket "chat-attachments" with Row Level Security allowing authenticated users to insert/select their own folder.
+- **Backend**: Implemented "uploadChatAttachment" server action in "lib/actions/chat.ts" using NextAuth session validation, and temporarily elevated "serverActions.bodySizeLimit" to '10mb' in "next.config.ts". Also updated "app/api/chat/route.ts" to convert the file to base64 inline data and pass it to Gemini.
+- **Trade-offs**: Used a Server Action to proxy file uploads instead of pure client-to-Supabase REST, because NextAuth cannot mint valid Supabase JWTs easily, meaning RLS wouldn't work for purely client-side fetch calls without a complex presigned-URL flow. The Server Action respects the 5MB file size limit effectively.

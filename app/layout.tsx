@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Medie Genie - AI Patient Portal",
-  description: "AI-assisted scheduling, prescriptions, records, and symptom checks",
+  description: "AI-assisted scheduling, prescriptions, records, and Genie Assist",
 };
 
 export default function RootLayout({

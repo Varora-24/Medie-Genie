@@ -136,10 +136,12 @@ export async function POST(req: NextRequest) {
 
   let message: string
   let sessionId: string | undefined
+  let attachmentUrl: string | undefined
   try {
     const body = await req.json()
     message = body.message
     sessionId = body.sessionId
+    attachmentUrl = body.attachmentUrl
   } catch {
     return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
   }
@@ -166,7 +168,7 @@ export async function POST(req: NextRequest) {
 
     // Save patient message
     await db.chatMessage.create({
-      data: { sessionId: chatSessionId, senderRole: 'PATIENT', content: trimmedMessage, flagged: false },
+      data: { sessionId: chatSessionId, senderRole: 'PATIENT', content: trimmedMessage, flagged: false, attachmentUrl },
     })
 
     // Fetch history
@@ -181,6 +183,32 @@ export async function POST(req: NextRequest) {
       role: msg.senderRole === 'PATIENT' ? 'user' : 'model',
       parts: [{ text: msg.content }],
     }))
+
+    // Build the current message parts
+    const currentMessageParts: any[] = [{ text: trimmedMessage }]
+    
+    if (attachmentUrl) {
+      try {
+        const fileRes = await fetch(attachmentUrl, {
+          headers: {
+            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          }
+        })
+        if (fileRes.ok) {
+          const buffer = await fileRes.arrayBuffer()
+          const base64 = Buffer.from(buffer).toString('base64')
+          const mimeType = fileRes.headers.get('content-type') || 'application/octet-stream'
+          currentMessageParts.push({
+            inlineData: {
+              data: base64,
+              mimeType
+            }
+          })
+        }
+      } catch (err) {
+        console.error('Failed to fetch attachment for Gemini:', err)
+      }
+    }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
     const model = genAI.getGenerativeModel({
@@ -206,7 +234,7 @@ export async function POST(req: NextRequest) {
         generationConfig: { maxOutputTokens: 1024 },
       })
 
-      const result = await chat.sendMessage(trimmedMessage)
+      const result = await chat.sendMessage(currentMessageParts)
       
       const functionCalls = result.response.functionCalls()
       if (functionCalls && functionCalls.length > 0) {

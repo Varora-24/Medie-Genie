@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useTransition } from 'react'
-import { getChatMessages } from '@/lib/actions/chat'
+import { getChatMessages, uploadChatAttachment } from '@/lib/actions/chat'
 import {
   Send,
   Loader2,
@@ -13,7 +13,10 @@ import {
   ChevronLeft,
   HeartPulse,
   Pill,
-  Phone
+  Phone,
+  Paperclip,
+  X,
+  FileText
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -29,6 +32,7 @@ interface ChatMessage {
   senderRole: string
   content: string
   flagged: boolean
+  attachmentUrl?: string | null
   createdAt: Date
 }
 
@@ -46,9 +50,11 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
   const [confirmingTool, setConfirmingTool] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [, startTransition] = useTransition()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -85,7 +91,7 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
 
   const sendChatMessage = async (text: string) => {
     const trimmed = text.trim()
-    if (!trimmed || isLoading) return
+    if ((!trimmed && !selectedFile) || isLoading) return
 
     setError(null)
 
@@ -93,22 +99,38 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
     const optimisticUserMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       senderRole: 'PATIENT',
-      content: trimmed,
+      content: trimmed || (selectedFile ? `[Attached file: ${selectedFile.name}]` : ''),
       flagged: false,
+      attachmentUrl: selectedFile ? URL.createObjectURL(selectedFile) : null,
       createdAt: new Date(),
     }
     setMessages((prev) => [...prev, optimisticUserMsg])
-    // Clear input on submit
+    
     setInput('')
     setIsLoading(true)
+    
+    let uploadedUrl = null
+    const fileToUpload = selectedFile
+    setSelectedFile(null)
 
     try {
+      if (fileToUpload) {
+        const formData = new FormData()
+        formData.append('file', fileToUpload)
+        const uploadRes = await uploadChatAttachment(formData)
+        if (uploadRes.error) {
+          throw new Error(uploadRes.error)
+        }
+        uploadedUrl = uploadRes.url
+      }
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: trimmed,
+          message: trimmed || `[Attached file: ${fileToUpload?.name}]`,
           sessionId: activeSessionId || undefined,
+          attachmentUrl: uploadedUrl,
         }),
       })
 
@@ -307,7 +329,7 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
             <ChevronLeft className="h-4 w-4" />
           </button>
           <Bot className="h-4.5 w-4.5 text-indigo-600" />
-          <span className="text-sm font-semibold text-slate-800">Symptom Assistant</span>
+          <span className="text-sm font-semibold text-slate-800">Genie Assist</span>
         </div>
 
         {/* Messages */}
@@ -316,7 +338,7 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
             <div className="flex flex-col items-center justify-center h-full text-center px-6">
               <Bot className="h-10 w-10 text-slate-300 mb-3" />
               <h3 className="text-base font-bold text-slate-700 mb-1">
-                Describe your symptoms
+                How can Genie Assist help?
               </h3>
               <p className="text-sm text-slate-400 max-w-sm">
                 Tell me what you&apos;re experiencing and I&apos;ll provide general
@@ -366,6 +388,22 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
                       <div className="flex items-center gap-1.5 text-red-600 text-xs font-bold mb-2">
                         <AlertTriangle className="h-3.5 w-3.5" />
                         Emergency guidance
+                      </div>
+                    )}
+                    {msg.attachmentUrl && (
+                      <div className="mb-2">
+                        {msg.attachmentUrl.endsWith('.pdf') ? (
+                          <a href={msg.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-white/10 rounded-lg border border-white/20 hover:bg-white/20 transition-colors">
+                            <FileText className="h-4 w-4" />
+                            <span className="text-xs font-medium truncate max-w-[200px]">Attached PDF</span>
+                          </a>
+                        ) : (
+                          <img 
+                            src={msg.attachmentUrl} 
+                            alt="Attachment" 
+                            className="max-w-full max-h-48 rounded-lg object-contain bg-white/5 border border-white/10"
+                          />
+                        )}
                       </div>
                     )}
                     {renderMessageContent(msg)}
@@ -471,13 +509,65 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
 
         {/* Input bar */}
         <div className="p-4 border-t border-slate-200 bg-white flex-shrink-0">
+          
+          {/* File Preview */}
+          {selectedFile && (
+            <div className="mb-3 flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-100 rounded-xl relative">
+              <div className="flex items-center justify-center h-10 w-10 bg-white rounded-lg border border-indigo-200 text-indigo-500 overflow-hidden">
+                {selectedFile.type.startsWith('image/') ? (
+                  <img src={URL.createObjectURL(selectedFile)} alt="Preview" className="h-full w-full object-cover" />
+                ) : (
+                  <FileText className="h-5 w-5" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-800 truncate">{selectedFile.name}</p>
+                <p className="text-xs text-slate-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+              </div>
+              <button 
+                onClick={() => setSelectedFile(null)}
+                className="p-1.5 hover:bg-indigo-100 rounded-lg text-indigo-400 hover:text-indigo-600 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           <div className="flex items-end gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading || selectedFile !== null}
+              className="h-11 w-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors disabled:bg-slate-50 disabled:text-slate-300 cursor-pointer flex-shrink-0"
+              title="Attach an image or PDF"
+            >
+              <Paperclip className="h-5 w-5" />
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  if (file.size > 5 * 1024 * 1024) {
+                    setError('File must be smaller than 5MB')
+                    return
+                  }
+                  setSelectedFile(file)
+                  setError(null)
+                  inputRef.current?.focus()
+                }
+                e.target.value = ''
+              }}
+            />
+            
             <textarea
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Describe your symptoms…"
+              placeholder="How can Genie Assist help?..."
               rows={1}
               disabled={isLoading}
               className="flex-1 resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-400"
@@ -490,7 +580,7 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
             />
             <button
               onClick={handleSend}
-              disabled={isLoading || !input.trim()}
+              disabled={isLoading || (!input.trim() && !selectedFile)}
               className="h-11 w-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-colors disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer flex-shrink-0"
             >
               {isLoading ? (
