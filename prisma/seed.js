@@ -21,11 +21,7 @@ async function main() {
     },
   })
 
-  console.log('Successfully seeded admin account:', admin.email)
-
-  // --- SEED TEST DOCTOR ACCOUNTS ---
-  // NOTE: These are fake test accounts and should be removed before real doctors onboard.
-  const doctorPassword = await bcrypt.hash('DoctorTest123!', 10)
+  const crypto = require('crypto')
 
   const testDoctors = [
     { email: 'doctor1@mediegenie.test', name: 'Dr. Sarah Jenkins', specialty: 'General Physician' },
@@ -35,6 +31,9 @@ async function main() {
   ]
 
   for (const doc of testDoctors) {
+    const rawPassword = crypto.randomBytes(8).toString('hex') + '!'
+    const doctorPassword = await bcrypt.hash(rawPassword, 10)
+
     await prisma.user.upsert({
       where: { email: doc.email },
       update: {
@@ -51,7 +50,7 @@ async function main() {
         role: 'doctor',
       }
     })
-    console.log('Successfully seeded test doctor account:', doc.email)
+    console.log(`Successfully seeded test doctor account: ${doc.email} | Password: ${rawPassword}`)
   }
 }
 
