@@ -12,7 +12,8 @@ import {
   AlertTriangle,
   ChevronLeft,
   HeartPulse,
-  Pill
+  Pill,
+  Phone
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -33,14 +34,16 @@ interface ChatMessage {
 
 interface ChatInterfaceProps {
   initialSessions: ChatSession[]
+  emergencyContacts?: any[]
 }
 
-export default function ChatInterface({ initialSessions }: ChatInterfaceProps) {
+export default function ChatInterface({ initialSessions, emergencyContacts = [] }: ChatInterfaceProps) {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [confirmingTool, setConfirmingTool] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [, startTransition] = useTransition()
@@ -149,6 +152,85 @@ export default function ChatInterface({ initialSessions }: ChatInterfaceProps) {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  
+  const handleConfirmTool = async (messageId: string, sessionId: string, toolName: string, args: any) => {
+    setConfirmingTool(messageId)
+    setError(null)
+    try {
+      const res = await fetch('/api/chat/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, toolName, args })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Failed to execute action.')
+        return
+      }
+      
+      // Add success AI message
+      const aiMsg: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        senderRole: 'AI',
+        content: data.reply || '✅ Action completed successfully.',
+        flagged: false,
+        createdAt: new Date(),
+      }
+      setMessages((prev) => [...prev, aiMsg])
+    } catch {
+      setError('Network error during confirmation.')
+    } finally {
+      setConfirmingTool(null)
+    }
+  }
+
+  const renderMessageContent = (msg: ChatMessage) => {
+    if (msg.senderRole === 'AI') {
+      try {
+        const parsed = JSON.parse(msg.content)
+        if (parsed.type === 'TOOL_CALL_PENDING') {
+          return (
+            <div className="bg-white border border-indigo-100 p-4 rounded-xl shadow-sm my-2 text-slate-800">
+              <h4 className="font-bold mb-2 flex items-center gap-2">
+                <Bot className="h-4 w-4 text-indigo-600" />
+                Action Confirmation Required
+              </h4>
+              {parsed.name === 'create_reminder' && (
+                <p className="text-sm mb-4">
+                  I'll create a reminder for: <strong className="text-indigo-700">{parsed.args.title}</strong> on {new Date(parsed.args.dueDate).toLocaleString()}
+                </p>
+              )}
+              {parsed.name === 'book_appointment' && (
+                <p className="text-sm mb-4">
+                  I'll book an appointment on {new Date(parsed.args.dateTime).toLocaleString()} for "{parsed.args.reason}".
+                </p>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleConfirmTool(msg.id, activeSessionId as string, parsed.name, parsed.args)}
+                  disabled={confirmingTool === msg.id}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:bg-indigo-300"
+                >
+                  {confirmingTool === msg.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm'}
+                </button>
+                <button
+                  disabled={confirmingTool === msg.id}
+                  onClick={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors disabled:bg-slate-50 disabled:text-slate-400"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )
+        }
+      } catch (e) {
+        // Not a JSON tool call
+      }
+    }
+    return <div className="whitespace-pre-wrap">{msg.content}</div>
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -286,7 +368,7 @@ export default function ChatInterface({ initialSessions }: ChatInterfaceProps) {
                         Emergency guidance
                       </div>
                     )}
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    {renderMessageContent(msg)}
                   </div>
                 </div>
 
@@ -309,6 +391,33 @@ export default function ChatInterface({ initialSessions }: ChatInterfaceProps) {
                           <HeartPulse className="h-4 w-4" />
                           Find Emergency Rooms Near Me
                         </Link>
+                        
+                        {/* Emergency Contacts Section */}
+                        {emergencyContacts && emergencyContacts.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-red-200 space-y-2">
+                            <p className="text-sm text-red-800 font-bold flex items-center gap-2">
+                              <Phone className="h-4 w-4" />
+                              Notify your emergency contacts
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                              {emergencyContacts.map((contact) => (
+                                <a
+                                  key={contact.id}
+                                  href={`tel:${contact.phone}`}
+                                  className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-red-200 hover:border-red-300 transition-colors"
+                                >
+                                  <div>
+                                    <p className="text-sm font-bold text-slate-800">{contact.name}</p>
+                                    <p className="text-xs text-slate-500">{contact.relation}</p>
+                                  </div>
+                                  <div className="h-8 w-8 rounded-full bg-red-50 flex items-center justify-center text-red-600">
+                                    <Phone className="h-4 w-4" />
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2 max-w-[85%] lg:max-w-[70%]">

@@ -35,6 +35,7 @@ model User {
   payments              Payment[]
   notesAsPatient    DoctorNote[]   @relation("PatientNotes")
   notesAsDoctor     DoctorNote[]   @relation("DoctorNotes")
+  emergencyContacts EmergencyContact[]
 }
 
 model Appointment {
@@ -163,4 +164,14 @@ model DoctorApplication {
   reviewedAt      DateTime?
   rejectionReason String?
   createdAt       DateTime @default(now())
+}
+
+model EmergencyContact {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  relation  String
+  phone     String
+  createdAt DateTime @default(now())
 }

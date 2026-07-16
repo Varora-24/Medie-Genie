@@ -5,13 +5,20 @@ import { redirect } from 'next/navigation'
 import ChatInterface from './chat-interface'
 import { ShieldAlert } from 'lucide-react'
 
+import db from '@/lib/db'
+
 export default async function ChatPage() {
   const session = await auth()
   if (!session?.user) {
     redirect('/login')
   }
 
+  const userId = (session.user as any).id
   const chatSessions = await getChatSessions()
+  const emergencyContacts = await db.emergencyContact.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'asc' }
+  })
 
   return (
     <div className="space-y-4">
@@ -29,7 +36,7 @@ export default async function ChatPage() {
         </div>
       </div>
 
-      <ChatInterface initialSessions={chatSessions as any} />
+      <ChatInterface initialSessions={chatSessions as any} emergencyContacts={emergencyContacts as any} />
     </div>
   )
 }

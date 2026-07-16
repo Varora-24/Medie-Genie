@@ -16,7 +16,8 @@ import {
   Pill,
   Search,
   MessageSquare,
-  Bell
+  Bell,
+  Phone
 } from 'lucide-react'
 import { getAppointments } from '@/lib/actions/appointments'
 import { getDoctorPatients } from '@/lib/actions/notes'
@@ -35,6 +36,7 @@ export default async function DashboardPage() {
   let activePrescriptions: any[] = []
   let recentRecords: any[] = []
   let dueReminders: any[] = []
+  let emergencyContacts: any[] = []
 
   if (role === 'doctor') {
     appointments = await getAppointments()
@@ -60,6 +62,10 @@ export default async function DashboardPage() {
     dueReminders = await db.reminder.findMany({
       where: { userId, isCompleted: false, scheduleTime: { lte: new Date() } },
       orderBy: { scheduleTime: 'asc' }
+    })
+    emergencyContacts = await db.emergencyContact.findMany({
+      where: { userId },
+      take: 5
     })
   }
 
@@ -352,6 +358,44 @@ export default async function DashboardPage() {
                   AI Symptom Checker
                 </Link>
               </div>
+            </div>
+          )}
+
+          {/* Emergency Contacts Card */}
+          {role === 'patient' && (
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                  <Phone className="h-5 w-5 text-rose-500" />
+                  Emergency Contacts
+                </h3>
+                <Link href="/dashboard/emergency-contacts" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                  Manage
+                </Link>
+              </div>
+              
+              {emergencyContacts.length > 0 ? (
+                <div className="space-y-3">
+                  {emergencyContacts.map((contact) => (
+                    <div key={contact.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <div>
+                        <p className="font-semibold text-slate-800 text-sm">{contact.name}</p>
+                        <p className="text-xs text-slate-500">{contact.relation}</p>
+                      </div>
+                      <a href={`tel:${contact.phone}`} className="p-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors">
+                        <Phone className="h-4 w-4" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-slate-500 mb-3">No emergency contacts added yet.</p>
+                  <Link href="/dashboard/emergency-contacts" className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                    <AlertCircle className="h-4 w-4" /> Add Contacts
+                  </Link>
+                </div>
+              )}
             </div>
           )}
           
