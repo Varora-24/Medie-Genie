@@ -213,7 +213,7 @@ export async function POST(req: NextRequest) {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
     const model = genAI.getGenerativeModel({
       model: 'gemini-3.1-flash-lite',
-      systemInstruction: SYSTEM_PROMPT,
+      systemInstruction: SYSTEM_PROMPT + `\n\nCURRENT SERVER TIME: ${new Date().toISOString()}\nUse this time as the reference for any relative dates like "tomorrow" or "next week".`,
       tools: [{
         functionDeclarations: [
           createReminderDecl,
@@ -260,8 +260,32 @@ export async function POST(req: NextRequest) {
         }
         // Handle mutation tools (require confirmation)
         else if (call.name === 'create_reminder' || call.name === 'book_appointment') {
-          isPendingTool = true
-          aiReplyText = JSON.stringify({ type: 'TOOL_CALL_PENDING', name: call.name, args: call.args })
+          let errorMsg = null;
+          if (call.name === 'create_reminder') {
+            const dueDate = new Date((call.args as any).dueDate);
+            if (isNaN(dueDate.getTime()) || dueDate < new Date()) {
+              errorMsg = "I couldn't create the reminder because the specified date is in the past or invalid. Please provide a future date.";
+            }
+          } else if (call.name === 'book_appointment') {
+            const dateTime = new Date((call.args as any).dateTime);
+            if (isNaN(dateTime.getTime()) || dateTime < new Date()) {
+              errorMsg = "I couldn't book the appointment because the specified date is in the past or invalid. Please provide a future date.";
+            } else {
+              const doctorId = (call.args as any).doctorId;
+              const doctor = await db.user.findUnique({ where: { id: doctorId, role: 'doctor' } });
+              if (!doctor) {
+                errorMsg = "I couldn't book the appointment because the specified doctor could not be found. Please choose a valid doctor from the available list.";
+              }
+            }
+          }
+
+          if (errorMsg) {
+            // Tell the model it failed, or just return the error to the user
+            aiReplyText = errorMsg;
+          } else {
+            isPendingTool = true
+            aiReplyText = JSON.stringify({ type: 'TOOL_CALL_PENDING', name: call.name, args: call.args })
+          }
         }
       } else {
         aiReplyText = result.response.text()

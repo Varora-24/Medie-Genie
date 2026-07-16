@@ -184,14 +184,13 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
       const res = await fetch('/api/chat/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, toolName, args })
+        body: JSON.stringify({ messageId, sessionId, toolName, args })
       })
       const data = await res.json()
       if (!res.ok) {
         setError(data.error || 'Failed to execute action.')
         return
       }
-      
       // Add success AI message
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
@@ -200,7 +199,17 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
         flagged: false,
         createdAt: new Date(),
       }
-      setMessages((prev) => [...prev, aiMsg])
+      
+      // Update the original pending tool call message to actioned
+      setMessages((prev) => prev.map(m => {
+        if (m.id === messageId) {
+          return {
+            ...m,
+            content: JSON.stringify({ type: 'TOOL_CALL_ACTIONED', name: toolName, args })
+          }
+        }
+        return m
+      }).concat(aiMsg))
     } catch {
       setError('Network error during confirmation.')
     } finally {
@@ -245,6 +254,17 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
                   Cancel
                 </button>
               </div>
+            </div>
+          )
+        } else if (parsed.type === 'TOOL_CALL_ACTIONED') {
+          return (
+            <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl shadow-sm my-2 text-slate-800 flex items-center gap-2">
+              <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-emerald-600 font-bold text-xs">✓</span>
+              </div>
+              <p className="text-sm font-medium text-emerald-800">
+                {parsed.name === 'create_reminder' ? 'Reminder created successfully.' : 'Appointment booked successfully.'}
+              </p>
             </div>
           )
         }
