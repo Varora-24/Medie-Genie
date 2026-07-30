@@ -237,4 +237,4 @@ Medie-Genie/
 | 8 | ✅ Complete | Emergency contacts CRUD, doctor application workflow, Google OAuth, tabbed login |
 | 9 | ✅ Complete | Genie Assist renamed (was "AI Symptom Chat"), chat file attachments via Supabase `chat-attachments` |
 | Performance | ✅ Applied | DB indexes migration, Promise.all parallelization, N+1 fix (getDoctorPatients distinct), history filtering |
-| Bug Fixes | ✅ Applied | doctorId hallucination prevention (system prompt rule + history filtering), date validation, idempotency, rate limiting on action endpoint |
+| Bug Fixes | ✅ Applied | doctorId hallucination prevention (system prompt rule + DOCTOR_LIST_RESULT DB persistence + history filtering), date validation, idempotency, rate limiting, and fixed 5XX crash on dashboard from null session race conditions |
