@@ -8,7 +8,7 @@ export default async function DoctorApplicationsPage() {
   const session = await auth()
   const role = (session?.user as any)?.role
 
-  if (role !== 'admin') {
+  if (!session?.user || role !== 'admin') {
     redirect('/dashboard')
   }
 
@@ -28,7 +28,7 @@ export default async function DoctorApplicationsPage() {
         </div>
       </div>
 
-      <ApplicationsList initialApplications={applications} adminId={(session?.user as any).id} />
+      <ApplicationsList initialApplications={applications} adminId={(session.user as any).id} />
     </div>
   )
 }

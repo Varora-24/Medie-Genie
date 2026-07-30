@@ -26,10 +26,19 @@ import CompleteReminderButton from '@/components/complete-reminder-button'
 
 export default async function DashboardPage() {
   const session = await auth()
-  const role = (session?.user as any).role || 'patient'
-  const userName = session?.user?.name || 'User'
   
-  const userId = (session?.user as any).id
+  // Guard: if session is null here (race with layout, or Vercel cold start timing),
+  // do not crash with TypeError. Layout redirect() handles the redirect, but the page
+  // component can still render briefly before redirect completes on cold starts.
+  if (!session?.user) {
+    // Return minimal placeholder — layout redirect will take over
+    return null
+  }
+  
+  const role = (session.user as any).role || 'patient'
+  const userName = session.user?.name || 'User'
+  
+  const userId = (session.user as any).id
   
   let appointments: any[] = []
   let patients: any[] = []
