@@ -182,6 +182,7 @@ export async function POST(req: NextRequest) {
 
     // Build Gemini chat history from DB messages, excluding tool call JSON payloads
     // to prevent malformed history that breaks the Gemini chat API.
+    // DOCTOR_LIST_RESULT messages are converted to a structured model turn so IDs persist across turns.
     const historyExceptLast = history.slice(0, -1)
       .filter((msg) => {
         // Filter out TOOL_CALL_PENDING/ACTIONED JSON messages — these are internal state
@@ -189,13 +190,29 @@ export async function POST(req: NextRequest) {
         try {
           const parsed = JSON.parse(msg.content)
           if (parsed.type === 'TOOL_CALL_PENDING' || parsed.type === 'TOOL_CALL_ACTIONED') return false
+          // DOCTOR_LIST_RESULT is handled below — don't filter, keep for special processing
         } catch { /* Not JSON — keep it */ }
         return true
       })
-      .map((msg) => ({
-        role: msg.senderRole === 'PATIENT' ? 'user' : 'model',
-        parts: [{ text: msg.content }],
-      }))
+      .map((msg) => {
+        // Special handling: convert DOCTOR_LIST_RESULT to a plaintext model message
+        // that includes the structured {id, name, specialty} data so the model can
+        // reference real IDs in subsequent booking turns.
+        try {
+          const parsed = JSON.parse(msg.content)
+          if (parsed.type === 'DOCTOR_LIST_RESULT') {
+            const doctorLines = parsed.doctors.map((d: any) => `- ${d.name} (ID: ${d.id}, Specialty: ${d.specialty || 'General'})`).join('\n')
+            return {
+              role: 'model' as const,
+              parts: [{ text: `I found these available doctors:\n${doctorLines}\n\nIMPORTANT: Use ONLY these exact IDs when booking.` }]
+            }
+          }
+        } catch { /* Not JSON */ }
+        return {
+          role: msg.senderRole === 'PATIENT' ? 'user' as const : 'model' as const,
+          parts: [{ text: msg.content }],
+        }
+      })
 
     // Build the current message parts
     const currentMessageParts: any[] = [{ text: trimmedMessage }]
@@ -256,8 +273,26 @@ export async function POST(req: NextRequest) {
         // Handle read-only tools
         if (call.name === 'list_available_doctors') {
           const specialty = (call.args as any).specialty
-          const whereClause = specialty ? { role: 'doctor', specialty: { contains: specialty, mode: 'insensitive' } } : { role: 'doctor' }
-          const doctors = await db.user.findMany({ where: whereClause as any, select: { id: true, name: true, specialty: true } })
+          // STRICT: only role='doctor', never include patients/admins
+          const whereClause: any = { role: 'doctor' }
+          if (specialty) whereClause.specialty = { contains: specialty, mode: 'insensitive' }
+          const doctors = await db.user.findMany({ 
+            where: whereClause, 
+            select: { id: true, name: true, specialty: true },
+            orderBy: { name: 'asc' }
+          })
+          console.log('[list_available_doctors] Returning doctors:', JSON.stringify(doctors))
+          
+          // Save structured doctor list to DB so IDs persist across multi-turn conversations
+          await db.chatMessage.create({
+            data: {
+              sessionId: chatSessionId,
+              senderRole: 'AI',
+              content: JSON.stringify({ type: 'DOCTOR_LIST_RESULT', doctors }),
+              flagged: false,
+            }
+          })
+          
           const toolResult = await chat.sendMessage([{ functionResponse: { name: call.name, response: { doctors } } }])
           aiReplyText = toolResult.response.text()
         } 
@@ -280,14 +315,47 @@ export async function POST(req: NextRequest) {
               errorMsg = "I couldn't create the reminder because the specified date is in the past or invalid. Please provide a future date.";
             }
           } else if (call.name === 'book_appointment') {
+            const doctorId = (call.args as any).doctorId;
             const dateTime = new Date((call.args as any).dateTime);
+            
+            // === DIAGNOSTIC LOGGING ===
+            console.log('[book_appointment] RECEIVED FROM GEMINI:', JSON.stringify({
+              doctorId,
+              dateTime: (call.args as any).dateTime,
+              reason: (call.args as any).reason,
+              sessionId: chatSessionId
+            }))
+            
+            // Log what list_available_doctors returned in this session
+            const sessionMessages = await db.chatMessage.findMany({
+              where: { sessionId: chatSessionId, senderRole: 'AI' },
+              select: { content: true, createdAt: true },
+              orderBy: { createdAt: 'asc' }
+            })
+            const listDoctorMessages = sessionMessages.filter(m => {
+              try { return m.content.includes('"id"') && m.content.includes('"name"') } catch { return false }
+            })
+            console.log('[book_appointment] DOCTOR LIST MESSAGES IN SESSION:', JSON.stringify(listDoctorMessages.map(m => m.content.slice(0, 500))))
+            // === END DIAGNOSTIC LOGGING ===
+            
             if (isNaN(dateTime.getTime()) || dateTime < new Date()) {
               errorMsg = "I couldn't book the appointment because the specified date is in the past or invalid. Please provide a future date.";
             } else {
-              const doctorId = (call.args as any).doctorId;
-              const doctor = await db.user.findUnique({ where: { id: doctorId, role: 'doctor' } });
+              // DB lookup with logging
+              const doctor = await db.user.findUnique({ where: { id: doctorId } });
+              console.log('[book_appointment] DB LOOKUP RESULT:', JSON.stringify({ 
+                doctorId, 
+                found: !!doctor, 
+                role: doctor?.role, 
+                name: doctor?.name 
+              }))
+              
               if (!doctor) {
-                errorMsg = "I couldn't book the appointment because the specified doctor could not be found. Please choose a valid doctor from the available list.";
+                errorMsg = `I couldn't book the appointment because the doctor ID "${doctorId}" was not found in the database. Please first list available doctors and try again.`;
+                console.log('[book_appointment] FAIL: doctor not found at all in DB for id:', doctorId)
+              } else if (doctor.role !== 'doctor') {
+                errorMsg = `I couldn't book the appointment because "${doctor.name}" is not registered as a doctor. Please choose from the available doctors list.`;
+                console.log('[book_appointment] FAIL: user found but role is', doctor.role, 'not doctor')
               }
             }
           }
