@@ -31,24 +31,21 @@ export async function getDoctorPatients() {
   }
 
   // Find all unique patients this doctor has appointments with
+  // Use distinct on patientId to avoid pulling all appointments into JS memory
   const appointments = await db.appointment.findMany({
     where: { doctorId: userId },
-    select: { dateTime: true, patient: { select: { id: true, name: true, email: true } } },
+    distinct: ['patientId'],
+    select: {
+      dateTime: true,
+      patient: { select: { id: true, name: true, email: true } }
+    },
     orderBy: { dateTime: 'desc' }
   })
 
-  // Deduplicate and keep the most recent appointment date (since it's ordered by desc)
-  const patientMap = new Map()
-  appointments.forEach(a => {
-    if (!patientMap.has(a.patient.id)) {
-      patientMap.set(a.patient.id, {
-        ...a.patient,
-        lastAppointment: a.dateTime
-      })
-    }
-  })
-
-  return Array.from(patientMap.values())
+  return appointments.map(a => ({
+    ...a.patient,
+    lastAppointment: a.dateTime
+  }))
 }
 
 export async function getPatientNotes(patientId: string) {

@@ -56,7 +56,8 @@ RULES YOU MUST FOLLOW:
    When any emergency symptom is detected, begin your response with EXACTLY: "⚠️ EMERGENCY: Based on what you've described, please seek emergency medical care immediately. Call your local emergency services (e.g. 911) right now."
 5. Be empathetic, clear, and concise. Use plain language, not medical jargon.
 6. If asked about topics outside of health/medical, politely redirect to health-related questions.
-7. You have access to tools to book appointments, create reminders, check available doctors, and get emergency contacts. Use them when appropriate.`
+7. You have access to tools to book appointments, create reminders, check available doctors, and get emergency contacts. Use them when appropriate.
+8. CRITICAL — BOOKING RULE: You MUST always call list_available_doctors first to get real doctor IDs from the system. NEVER invent, guess, or remember a doctorId from a previous session. Only use a doctorId that was returned by list_available_doctors in the current conversation. If you do not have a doctorId from list_available_doctors in this conversation, call that tool first before proposing any booking.`
 
 // ── Tool Declarations ────────────────────────────────────────────────
 const createReminderDecl: FunctionDeclaration = {
@@ -179,10 +180,22 @@ export async function POST(req: NextRequest) {
       select: { senderRole: true, content: true },
     })
 
-    const historyExceptLast = history.slice(0, -1).map((msg) => ({
-      role: msg.senderRole === 'PATIENT' ? 'user' : 'model',
-      parts: [{ text: msg.content }],
-    }))
+    // Build Gemini chat history from DB messages, excluding tool call JSON payloads
+    // to prevent malformed history that breaks the Gemini chat API.
+    const historyExceptLast = history.slice(0, -1)
+      .filter((msg) => {
+        // Filter out TOOL_CALL_PENDING/ACTIONED JSON messages — these are internal state
+        // and not valid Gemini chat history turns.
+        try {
+          const parsed = JSON.parse(msg.content)
+          if (parsed.type === 'TOOL_CALL_PENDING' || parsed.type === 'TOOL_CALL_ACTIONED') return false
+        } catch { /* Not JSON — keep it */ }
+        return true
+      })
+      .map((msg) => ({
+        role: msg.senderRole === 'PATIENT' ? 'user' : 'model',
+        parts: [{ text: msg.content }],
+      }))
 
     // Build the current message parts
     const currentMessageParts: any[] = [{ text: trimmedMessage }]

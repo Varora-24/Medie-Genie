@@ -39,34 +39,38 @@ export default async function DashboardPage() {
   let emergencyContacts: any[] = []
 
   if (role === 'doctor') {
-    appointments = await getAppointments()
-    patients = await getDoctorPatients()
+    ;[appointments, patients] = await Promise.all([
+      getAppointments(),
+      getDoctorPatients(),
+    ])
   } else if (role === 'patient') {
-    appointments = await db.appointment.findMany({
-      where: { patientId: userId },
-      include: { doctor: true },
-      orderBy: { dateTime: 'asc' }
-    })
-    activePrescriptions = await db.prescription.findMany({
-      where: { patientId: userId, endDate: { gte: new Date() } },
-      include: { doctor: true },
-      orderBy: { createdAt: 'desc' },
-      take: 3
-    })
-    recentRecords = await db.medicalRecord.findMany({
-      where: { patientId: userId },
-      include: { doctor: true },
-      orderBy: { createdAt: 'desc' },
-      take: 3
-    })
-    dueReminders = await db.reminder.findMany({
-      where: { userId, isCompleted: false, scheduleTime: { lte: new Date() } },
-      orderBy: { scheduleTime: 'asc' }
-    })
-    emergencyContacts = await db.emergencyContact.findMany({
-      where: { userId },
-      take: 5
-    })
+    ;[appointments, activePrescriptions, recentRecords, dueReminders, emergencyContacts] = await Promise.all([
+      db.appointment.findMany({
+        where: { patientId: userId },
+        include: { doctor: { select: { name: true, specialty: true } } },
+        orderBy: { dateTime: 'asc' },
+      }),
+      db.prescription.findMany({
+        where: { patientId: userId, endDate: { gte: new Date() } },
+        include: { doctor: { select: { name: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+      }),
+      db.medicalRecord.findMany({
+        where: { patientId: userId },
+        select: { id: true, title: true, type: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+      }),
+      db.reminder.findMany({
+        where: { userId, isCompleted: false, scheduleTime: { lte: new Date() } },
+        orderBy: { scheduleTime: 'asc' },
+      }),
+      db.emergencyContact.findMany({
+        where: { userId },
+        take: 5,
+      }),
+    ])
   }
 
   const pendingAppointments = appointments.filter((a: any) => a.status === 'PENDING')

@@ -122,11 +122,20 @@ export async function POST(req: NextRequest) {
       select: { senderRole: true, content: true },
     })
 
-    // Filter out the JSON tool call from history if needed, or pass it as model
-    const historyExceptLast = history.map((msg) => ({
-      role: msg.senderRole === 'PATIENT' ? 'user' : 'model',
-      parts: [{ text: msg.content }],
-    }))
+    // Filter out TOOL_CALL_PENDING/ACTIONED JSON messages from history to
+    // prevent them from breaking the Gemini chat API.
+    const historyExceptLast = history
+      .filter((msg) => {
+        try {
+          const parsed = JSON.parse(msg.content)
+          if (parsed.type === 'TOOL_CALL_PENDING' || parsed.type === 'TOOL_CALL_ACTIONED') return false
+        } catch { /* Not JSON — keep it */ }
+        return true
+      })
+      .map((msg) => ({
+        role: msg.senderRole === 'PATIENT' ? 'user' : 'model',
+        parts: [{ text: msg.content }],
+      }))
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
     const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' })

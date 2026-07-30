@@ -13,8 +13,10 @@ export default async function AppointmentsPage() {
   }
 
   const role = (session.user as any).role || 'patient'
-  const doctors = await getDoctors()
-  const appointments = await getAppointments()
+  const [doctors, appointments] = await Promise.all([
+    getDoctors(),
+    getAppointments(),
+  ])
 
   return (
     <div className="space-y-8">

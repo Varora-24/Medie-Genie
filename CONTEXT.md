@@ -1,14 +1,14 @@
 # Medie Genie — Project Context
 
-> This document captures the full architectural context, decisions made, features implemented, and current state of the Medie Genie project as of July 2026. It is intended for any developer (or AI agent) picking up work on this codebase.
+> **IMPORTANT — Why CONTEXT.md Drifted Previously**: The earlier version of this file was written in full after Phase 2-3, and never updated as Phases 4-9 were implemented. Each subsequent session re-discovered the architecture from scratch. Going forward: update this file at the END of every phase before committing, not after.
 
 ---
 
 ## 1. Project Overview
 
-**Medie Genie** is a patient portal web application that lets users book doctor appointments, view prescriptions, upload medical records to cloud storage, and set medication reminders. It is deployed at **[https://medie-genie.vercel.app](https://medie-genie.vercel.app)** and the source lives at **[github.com/Varora-24/Medie-Genie](https://github.com/Varora-24/Medie-Genie)**.
+**Medie Genie** is a patient portal web application deployed at **[https://medie-genie.vercel.app](https://medie-genie.vercel.app)**. Source: **[github.com/Varora-24/Medie-Genie](https://github.com/Varora-24/Medie-Genie)**.
 
-The project was originally part of a monorepo called "Smart Trainer" and was extracted into its own standalone repository. The initial codebase had mock/fake services and a static HTML frontend; it was rebuilt from scratch using Next.js during Phase 1.
+All commits go directly to `main` (no branches, no PRs) as documented in `AGENTS.md`.
 
 ---
 
@@ -20,262 +20,221 @@ The project was originally part of a monorepo called "Smart Trainer" and was ext
 | Language | TypeScript (strict mode) | 5.x |
 | Database ORM | Prisma | 6.19.3 |
 | Database | Supabase PostgreSQL | ap-southeast-2 region |
-| File Storage | Supabase Storage (REST API) | Bucket: `medical-records` |
+| File Storage | Supabase Storage (REST API) | Buckets: `medical-records`, `chat-attachments` |
 | Authentication | Auth.js / NextAuth v5 | 5.0.0-beta.31 |
+| OAuth | Google OAuth (via Auth.js auto-detect) | — |
 | Password Hashing | bcryptjs | 3.x |
+| Encryption | Node.js `crypto` AES-256-GCM | Built-in |
 | UI Components | shadcn/ui + Radix primitives | Tailwind v4 |
 | Styling | Tailwind CSS | 4.x |
-| Validation | Zod | 4.x |
+| Payments | Stripe | 2026-06-24.dahlia API version |
+| AI / LLM | Google Gemini 3.1 Flash Lite | `@google/generative-ai` |
+| Facility Search | OpenStreetMap Nominatim + Overpass API | Free, no API key |
 | Icons | Lucide React | 1.23.x |
 | Toast Notifications | Sonner | 2.x |
-| Testing | Jest + Testing Library | Jest 30.x |
 | Deployment | Vercel (auto-deploy from `main`) | — |
 
 ---
 
-## 3. Repository Structure
+## 3. Repository Structure (Verified July 2026)
 
 ```
 Medie-Genie/
 ├── app/
 │   ├── (auth)/
-│   │   ├── login/page.tsx          # Login page (email + password)
-│   │   └── signup/page.tsx         # Signup page (hardcoded to patient role)
-│   ├── api/auth/[...nextauth]/     # NextAuth API route handler
+│   │   ├── login/page.tsx              # Tabbed login: Patient/Doctor/Admin tabs + Google OAuth
+│   │   └── signup/page.tsx             # Public signup (hardcoded to patient role)
+│   ├── apply-doctor/page.tsx           # Public doctor application form
+│   ├── api/
+│   │   ├── auth/[...nextauth]/route.ts # NextAuth handler
+│   │   ├── chat/route.ts               # Genie Assist: Gemini integration + tool-calling
+│   │   ├── chat/action/route.ts        # Genie Assist: confirmation execution endpoint
+│   │   ├── checkout/route.ts           # Stripe checkout session creation
+│   │   ├── maps/geocode/route.ts       # Geocoding proxy (for Find Care)
+│   │   ├── maps/places/route.ts        # (Legacy) Places proxy
+│   │   └── webhooks/stripe/route.ts    # Stripe webhook: idempotent payment fulfillment
 │   ├── dashboard/
-│   │   ├── layout.tsx              # Sidebar layout with role-based nav
-│   │   ├── page.tsx                # Dashboard home page
-│   │   ├── appointments/
-│   │   │   ├── page.tsx            # Appointments listing + booking
-│   │   │   ├── appointment-form.tsx
-│   │   │   └── appointment-list.tsx
-│   │   ├── prescriptions/
-│   │   │   └── page.tsx            # Prescriptions viewer
-│   │   ├── records/
-│   │   │   ├── page.tsx            # Medical records + file upload
-│   │   │   ├── record-form.tsx
-│   │   │   └── record-list.tsx
-│   │   └── reminders/
-│   │       ├── page.tsx            # Reminders CRUD
-│   │       ├── reminder-form.tsx
-│   │       └── reminder-list.tsx
-│   ├── globals.css                 # Tailwind v4 config + animations
-│   ├── layout.tsx                  # Root layout (fonts, Toaster)
-│   └── page.tsx                    # Landing page (redesigned)
+│   │   ├── layout.tsx                  # Sidebar with role-based nav (patient/doctor/admin)
+│   │   ├── page.tsx                    # Dashboard home (different UI per role)
+│   │   ├── appointments/               # Book, list, cancel, update status; Stripe checkout button
+│   │   ├── chat/                       # Genie Assist chat UI + file upload
+│   │   ├── doctor-applications/        # Admin: review/approve/reject doctor applications
+│   │   ├── emergency-contacts/         # Patient: add/edit/delete emergency contacts
+│   │   ├── find-care/                  # OpenStreetMap facility search
+│   │   ├── patients/                   # Doctor: patient roster
+│   │   ├── patients/[patientId]/       # Doctor: per-patient notes (AES-256-GCM) + prescription form
+│   │   ├── prescriptions/              # Patient/Doctor: prescriptions list
+│   │   ├── profile/                    # All roles: profile editing
+│   │   ├── records/                    # Patient/Doctor: medical record upload (Supabase Storage)
+│   │   ├── reminders/                  # Patient: medication/appointment/general reminders CRUD
+│   │   └── users/                      # Admin: user directory + staff account creation
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx                        # Landing page (honest copy, no false claims)
 ├── components/
-│   ├── scroll-fade-in.tsx          # IntersectionObserver scroll animation
-│   └── ui/
-│       └── button.tsx              # shadcn/ui Button component
+│   ├── complete-reminder-button.tsx    # Client component for marking reminders done
+│   ├── notification-bell.tsx           # Patient notification bell (due reminders indicator)
+│   ├── scroll-fade-in.tsx
+│   └── ui/button.tsx
 ├── lib/
 │   ├── actions/
-│   │   ├── appointments.ts         # Server actions: getDoctors, getAppointments, bookAppointment, cancelAppointment
-│   │   ├── prescriptions.ts        # Server actions: getPrescriptions
-│   │   ├── records.ts              # Server actions: getMedicalRecords, uploadMedicalRecord (Supabase Storage)
-│   │   └── reminders.ts            # Server actions: getReminders, createReminder, toggleReminderComplete, deleteReminder
-│   ├── auth-actions.ts             # Server actions: loginAction, signUpAction, logoutAction
-│   ├── auth-schemas.ts             # Zod schemas: LoginSchema, SignupSchema
-│   ├── db.ts                       # Prisma client singleton
-│   └── utils.ts                    # shadcn/ui cn() utility
+│   │   ├── admin.ts                    # getUsers, createStaffAccount (admin-only)
+│   │   ├── appointments.ts             # getDoctors, getAppointments, bookAppointment, cancelAppointment, updateAppointmentStatus
+│   │   ├── chat.ts                     # uploadChatAttachment (Supabase Storage for chat)
+│   │   ├── emergency-contacts.ts       # CRUD for EmergencyContact model
+│   │   ├── notes.ts                    # getDoctorPatients, getPatientNotes, addDoctorNote (AES-256-GCM)
+│   │   ├── prescriptions.ts            # getPrescriptions, addPrescription
+│   │   ├── records.ts                  # getMedicalRecords, uploadMedicalRecord
+│   │   └── reminders.ts                # getReminders, createReminder, toggleReminderComplete, deleteReminder
+│   ├── auth-actions.ts                 # loginAction, signUpAction, logoutAction
+│   ├── auth-schemas.ts                 # Zod schemas
+│   ├── db.ts                           # Prisma client singleton
+│   ├── encryption.ts                   # AES-256-GCM encryptNote / decryptNote using ENCRYPTION_KEY env var
+│   └── utils.ts
 ├── prisma/
-│   ├── schema.prisma               # 8 models (User, Appointment, Prescription, MedicalRecord, Reminder, ChatSession, ChatMessage, Payment)
-│   ├── migrations/                 # Applied migration: 20260708160119_init
-│   └── seed.js                     # Seeds default admin account
-├── public/
-│   └── mockups/                    # Generated UI mockup images for landing page
-├── auth.ts                         # NextAuth config with Credentials provider
-├── auth.config.ts                  # Auth callbacks: jwt (role+id), session, authorized
-├── middleware.ts                   # NextAuth edge middleware for route protection
-├── next.config.ts                  # Next.js config
-├── .env.example                    # Template for all required env vars
-├── AGENTS.md                       # Agent rules (commit to main, no branches)
-├── README.md                       # Project readme with setup guide
-└── package.json                    # Dependencies, scripts, prisma seed config
+│   ├── schema.prisma                   # 10 models (see §4 below)
+│   ├── migrations/                     # 9 applied migrations (latest: add_performance_indexes)
+│   └── seed.js                         # Seeds admin account with random password (logged to console, not committed)
+├── public/mockups/                     # UI mockup images for landing page
+├── auth.ts                             # NextAuth config (Credentials + Google providers)
+├── auth.config.ts                      # JWT/session callbacks injecting role+id; route guards
+├── middleware.ts                       # NextAuth edge middleware for route protection
+├── next.config.ts                      # serverActions.bodySizeLimit: '10mb' (for chat file uploads)
+├── AGENTS.md                           # Agent rules: commit to main only, no branches
+├── CONTEXT.md                          # This file — update at end of every phase
+└── package.json
 ```
 
 ---
 
-## 4. Database Schema
+## 4. Database Schema (10 Models)
 
-The Prisma schema defines **8 models** in a single PostgreSQL `public` schema on Supabase:
-
-| Model | Purpose | Key Relations |
+| Model | Purpose | Key Indexes |
 |---|---|---|
-| `User` | Patients, doctors, admins | Central entity; has role field (`patient` / `doctor` / `admin`) |
-| `Appointment` | Doctor-patient scheduling | FK to User (patientId, doctorId); statuses: PENDING, CONFIRMED, CANCELLED |
-| `Prescription` | Medication prescriptions | FK to User (patientId, doctorId); has medication, dosage, frequency, date range |
-| `MedicalRecord` | Lab results, diagnoses, etc. | FK to User; stores `fileUrl` pointing to Supabase Storage |
-| `Reminder` | Medication/appointment alerts | FK to User; types: MEDICATION, APPOINTMENT, GENERAL; has isCompleted toggle |
-| `ChatSession` | AI chat conversation container | FK to User (patientId); planned for Phase 3 |
-| `ChatMessage` | Individual chat messages | FK to ChatSession; senderRole: PATIENT or AI; planned for Phase 3 |
-| `Payment` | Billing/payment records | FK to User + optional FK to Appointment; planned for Phase 4 |
+| `User` | Patients, doctors, admins. Has `role`, `authProvider`, `specialty`, `image` | Email (unique) |
+| `Appointment` | Doctor-patient bookings. Status: PENDING → CONFIRMED/CANCELLED | `[patientId]`, `[doctorId]`, `[status]`, `[patientId, status]` |
+| `Prescription` | Prescriptions issued by doctors to patients | `[patientId]`, `[doctorId]` |
+| `MedicalRecord` | Lab results/diagnoses. `fileUrl` points to Supabase `medical-records` bucket | `[patientId]`, `[doctorId]` |
+| `Reminder` | Medication/appointment/general alerts. Has `isCompleted` toggle | `[userId]`, `[userId, isCompleted]`, `[scheduleTime]` |
+| `ChatSession` | Container for a Genie Assist conversation | `[patientId]` |
+| `ChatMessage` | Individual messages. `attachmentUrl` for Supabase `chat-attachments`. `flagged` for emergency detection. Content stores either plain text OR `TOOL_CALL_PENDING`/`TOOL_CALL_ACTIONED` JSON | `[sessionId]`, `[sessionId, createdAt]` |
+| `Payment` | Stripe payment records linked to appointments | `[patientId]`, `[appointmentId]`, `[status]` |
+| `DoctorNote` | Clinical notes. `encryptedContent` + `iv` stored (AES-256-GCM via `ENCRYPTION_KEY` env var). **If ENCRYPTION_KEY is lost, all existing notes are permanently unreadable.** | `[patientId]`, `[doctorId]` |
+| `DoctorApplication` | Public doctor application submissions reviewed by admin | `[status]` |
+| `EmergencyContact` | Up to 5 contacts per patient. Shown on dashboard + in Genie Assist emergency responses | `[userId]` |
 
-**Supabase Project**: `huednspoofanbpkiumvf` (region: `ap-southeast-2`)
-**Connection**: Pooled via port 6543 (`pgbouncer=true` in `DATABASE_URL`), direct on port 5432 (`DIRECT_URL` used for migrations).
+**Supabase Project**: `huednspoofanbpkiumvf` (ap-southeast-2). Pooled via port 6543 (`DATABASE_URL`), direct on port 5432 (`DIRECT_URL` for migrations).
 
 ---
 
 ## 5. Authentication Architecture
 
-- **Provider**: Auth.js (NextAuth v5) with a single `Credentials` provider.
-- **Password storage**: bcryptjs hash (cost factor 10).
-- **Session strategy**: JWT (not database sessions).
-- **JWT enrichment**: The `jwt` callback injects `role` and `id` from the User record into the token. The `session` callback exposes them as `session.user.role` and `session.user.id`.
-- **Route protection**: `middleware.ts` runs NextAuth's `authorized` callback on every non-static request. The `/dashboard/*` routes require authentication; authenticated users hitting `/login` or `/signup` are redirected to `/dashboard`.
-- **Signup restriction**: Public signup hardcodes `role: "patient"`. Doctor and admin accounts can only be created by seeding or (future) admin dashboard.
-- **Seeded admin**: `admin@mediegenie.com` / `AdminPass123!` (dev-only placeholder, not in committed docs).
+- **Providers**: Credentials (email+bcrypt) AND Google OAuth (auto-detected via `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` env vars).
+- **Login UI**: Three tabs (Patient / Doctor / Admin) — cosmetic only; actual role is from the DB record.
+- **Session**: JWT strategy. `jwt` callback injects `role` and `id` from DB. `session` callback exposes `session.user.role` and `session.user.id`.
+- **Route protection**: `middleware.ts` runs NextAuth `authorized` callback. `/dashboard/*` requires auth. `/login` and `/signup` redirect authenticated users away.
+- **Signup restriction**: Public signup hardcodes `role: "patient"`. Doctor accounts come from the doctor application workflow (admin approves → account created). Admin accounts created via admin User Directory panel.
 
 ---
 
 ## 6. Supabase Storage Security
 
-The `medical-records` bucket is configured as **private** (`public = false`). Two Row-Level Security policies are active on `storage.objects`:
+**`medical-records` bucket** — Private:
+- INSERT: Only authenticated users uploading to their own `{userId}/` folder.
+- SELECT: Only the patient who owns the record or their assigned doctor.
+- Server actions use `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS for uploads on behalf of users.
 
-1. **Upload policy** — `"Allow authenticated upload to own folder"`:
-   - `FOR INSERT TO authenticated`
-   - `WITH CHECK`: `bucket_id = 'medical-records' AND (storage.foldername(name))[1] = auth.uid()::text`
-   - Effect: users can only upload files to a folder named after their own user ID.
-
-2. **Read policy** — `"Allow patient or doctor read access"`:
-   - `FOR SELECT TO authenticated`
-   - `USING`: joins `storage.objects.name` against `MedicalRecord.fileUrl` and checks that the requester's `auth.uid()` matches either `patientId` or `doctorId` on that record.
-   - Effect: only the patient who owns the record or the assigned doctor can read the file.
-
-The Next.js server actions use `SUPABASE_SERVICE_ROLE_KEY` (a server-only secret) to bypass RLS when uploading files on behalf of authenticated users. The upload path is structured as `{userId}/{timestamp}.{extension}`.
+**`chat-attachments` bucket** — Private:
+- INSERT: Owner-scoped RLS (`{userId}/*` path).
+- SELECT: Owner-scoped RLS.
+- The `uploadChatAttachment` server action proxies uploads through Next.js (required because NextAuth cannot mint Supabase JWTs for client-side RLS). File is stored, then fetched and base64-encoded before being sent to Gemini.
 
 ---
 
-## 7. Environment Variables
+## 7. Genie Assist (AI Chat) Architecture
 
-All required variables (documented in `.env.example`):
+**Files**: `app/api/chat/route.ts` (main), `app/api/chat/action/route.ts` (confirmation), `app/dashboard/chat/` (UI)
+
+**Flow**:
+1. Patient sends message → POST `/api/chat`
+2. Server validates session, rate-limits (15/min), checks for emergency keywords.
+3. Current server time injected into Gemini system prompt for accurate relative date resolution.
+4. Gemini responds. If it returns a **function call**:
+   - **Read-only tools** (`list_available_doctors`, `get_emergency_contacts`, `find_nearby_care`): executed immediately server-side, result fed back to Gemini.
+   - **Mutation tools** (`book_appointment`, `create_reminder`): **pre-validated server-side** (date must be future, doctorId must exist in DB with `role='doctor'`). If valid, stored as `TOOL_CALL_PENDING` JSON in `ChatMessage.content`. UI shows confirmation card.
+5. Patient clicks Confirm → POST `/api/chat/action` with `messageId`, `sessionId`, `toolName`, `args`.
+6. Action route: re-validates session, rate-limits (15/min), **verifies message is still `TOOL_CALL_PENDING`** (idempotency), re-validates inputs, executes DB mutation, marks message as `TOOL_CALL_ACTIONED`.
+
+**Bug Fixes Applied**:
+- Model is instructed (rule #8) to ALWAYS call `list_available_doctors` first and only use returned IDs.
+- `TOOL_CALL_PENDING`/`TOOL_CALL_ACTIONED` messages are filtered out of Gemini chat history (they break history parsing and were a cause of hallucinated doctorIds across turns).
+- Hard server-side date validation rejects past dates before showing confirmation card.
+- Idempotency: double-confirming a card returns 400 "already processed."
+- Rate limiting: 15 req/min on BOTH `/api/chat` AND `/api/chat/action`.
+
+---
+
+## 8. Stripe Payments Architecture
+
+- `/api/checkout` — Creates Stripe Checkout session. Checks appointment ownership + PENDING status. Reuses existing pending Payment record (idempotent).
+- `/api/webhooks/stripe` — Handles `checkout.session.completed`. Uses `db.$transaction` for atomic idempotent update: marks Payment as COMPLETED, marks Appointment as CONFIRMED.
+- Consultation fee: $50.00 USD (hardcoded constant in `checkout/route.ts`).
+
+---
+
+## 9. Doctor Notes Encryption
+
+- `lib/encryption.ts` uses Node.js `crypto` AES-256-GCM with a random 12-byte IV per note.
+- Key sourced from `ENCRYPTION_KEY` env var (32-byte hex string). **This key must never be rotated without a re-encryption migration plan** — loss = permanent data loss.
+- Notes decrypted server-side in `lib/actions/notes.ts` before returning to client.
+- Access control: doctors can only view/write notes for patients they have an existing appointment with (`verifyDoctorAccess`).
+
+---
+
+## 10. Environment Variables
 
 | Variable | Purpose | Scope |
 |---|---|---|
 | `DATABASE_URL` | Prisma pooled connection (port 6543, pgbouncer) | Server |
 | `DIRECT_URL` | Prisma direct connection (port 5432, migrations) | Server |
-| `AUTH_SECRET` | NextAuth JWT signing secret (32+ chars) | Server |
+| `AUTH_SECRET` | NextAuth JWT signing secret | Server |
 | `NEXTAUTH_URL` | Application base URL | Server |
+| `AUTH_GOOGLE_ID` | Google OAuth client ID | Server |
+| `AUTH_GOOGLE_SECRET` | Google OAuth client secret | Server |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Client + Server |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous API key | Client + Server |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (bypasses RLS) | Server only |
-
-The `.env` file is gitignored. Only `.env.example` is tracked.
-
----
-
-## 8. Key Design Decisions
-
-1. **No branches**: All commits go directly to `main`. No PRs, no feature branches. This is a deliberate project rule documented in `AGENTS.md`.
-
-2. **Server Actions over API routes**: All data mutations (booking, cancellation, uploads, CRUD) use Next.js Server Actions (`'use server'`) rather than `/api/*` routes. The only API route is the NextAuth handler at `/api/auth/[...nextauth]`.
-
-3. **Single signup path**: The duplicate `app/api/signup/route.ts` was deleted. All signups go through the `signUpAction` server action in `lib/auth-actions.ts`.
-
-4. **Supabase Storage via REST**: Instead of using the `@supabase/supabase-js` SDK, file uploads are done via raw `fetch()` calls to the Supabase Storage REST API. This avoids adding another heavy dependency and keeps the upload logic transparent.
-
-5. **Role-based dashboard layout**: The sidebar navigation in `app/dashboard/layout.tsx` renders different links based on `session.user.role` (patient, doctor, admin). All role checks happen server-side.
-
-6. **Landing page honesty**: The landing page was redesigned to remove all false claims (HIPAA, military-grade security, AES-256, MFA, "thousands of patients") and replace them with honest, concrete descriptions of what the app actually does.
+| `GEMINI_API_KEY` | Google AI API key for Genie Assist | Server only |
+| `ENCRYPTION_KEY` | 32-byte hex key for AES-256-GCM doctor notes | Server only |
+| `STRIPE_SECRET_KEY` | Stripe secret key | Server only |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret | Server only |
 
 ---
 
-## 9. Development Phases & Current Status
+## 11. Key Design Decisions
 
-### Phase 1: Foundation ✅ Complete
-- Next.js App Router project scaffolded from scratch
-- Prisma schema with 8 models
-- Auth.js (NextAuth v5) with Credentials provider
-- bcryptjs password hashing
-- Role-aware dashboard layout with sidebar
-- Landing page, login page, signup page
-- Jest + Testing Library setup
-- Database migrations applied to Supabase
-- Admin account seeded
-
-### Phase 2: Patient Portal Core ✅ Complete
-- **Appointments**: Book, list, cancel — real DB writes, doctor list from `User` where `role = 'doctor'`
-- **Prescriptions**: List active/expired prescriptions filtered by patient ID
-- **Medical Records**: File upload to Supabase Storage with private bucket + RLS policies, record creation in DB
-- **Reminders**: Full CRUD (create, list, toggle complete, delete) against the `Reminder` table
-- Deployed to Vercel with all env vars configured
-- README updated with live URL and future scope
-- Landing page redesigned with honest copy and real UI mockups
-
-### Phase 3: AI Symptom Chatbot 🔲 Not Started
-- `ChatSession` and `ChatMessage` models exist in the schema but have no UI or server actions yet
-- Planned: integration with an LLM API (OpenAI or Gemini) for conversational symptom triage
-- The dashboard sidebar already has an "AI Symptom Chat" link pointing to `/dashboard/chat`
-
-### Phase 4: Dashboard Upgrades & Payments 🔲 Not Started
-- `Payment` model exists in the schema but has no UI or server actions
-- Planned: Stripe integration, admin dashboard for user management, doctor notes module
-- Doctor and admin account creation will be handled through the admin dashboard (not public signup)
+1. **Server Actions over API routes**: All data mutations use Next.js Server Actions (`'use server'`). Only exceptions: NextAuth (`/api/auth`), Gemini chat (`/api/chat`), Stripe checkout (`/api/checkout`), Stripe webhook (`/api/webhooks/stripe`), and map proxies.
+2. **No branches**: All commits directly to `main`.
+3. **Supabase Storage via REST**: Raw `fetch()` to Supabase REST API instead of SDK, to avoid heavy dependency and keep uploads transparent.
+4. **Role-based UI**: Sidebar, dashboard home, and page guards all check `session.user.role` server-side.
+5. **Concurrent DB queries**: Dashboard page and appointments page use `Promise.all` to run independent DB queries in parallel (not sequentially).
+6. **DB Indexes**: All FK-heavy fields (patientId, doctorId, userId, status, sessionId, scheduleTime) have explicit `@@index` directives. Migration `20260730161335_add_performance_indexes` applied.
+7. **Doctor application workflow**: Public `/apply-doctor` form → `DoctorApplication` record → Admin reviews at `/dashboard/doctor-applications` → Approval creates a real User record with `role='doctor'` and random password (emailed to applicant in future, for now logged to admin console).
 
 ---
 
-## 10. Deployment
+## 12. Completed Phases
 
-- **Platform**: Vercel (auto-deploys from the `main` branch on GitHub)
-- **Live URL**: [https://medie-genie.vercel.app](https://medie-genie.vercel.app)
-- **Build command**: `next build` (includes `prisma generate` via `postinstall`)
-- **Environment variables**: Set in Vercel project settings (DATABASE_URL, DIRECT_URL, AUTH_SECRET, AUTH_TRUST_HOST, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY)
-
----
-
-## 11. Local Development Setup
-
-```bash
-# Clone
-git clone https://github.com/Varora-24/Medie-Genie.git
-cd Medie-Genie
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env
-# Fill in real values in .env
-
-# Run database migrations
-npx prisma migrate dev
-
-# Seed admin account
-npx prisma db seed
-
-# Start dev server
-npm run dev
-```
-
----
-
-## 12. Commit History Summary
-
-| Commit | Description |
-|---|---|
-| `567ec80` | Cleanup: delete legacy static HTML files |
-| `8c81934` | Docs: write project README and TODO |
-| `a4e1a7a` | Test: add Jest config and sanity test |
-| `cea79b6` | Merge rebuild-v2 branch into main |
-| `1e32661` | Chore: update package name, configure prisma seed |
-| `4b713bf` | **Security**: remove role dropdown from signup, hardcode patient |
-| `fe85386` | Refactor: delete duplicate API signup route, add seed script |
-| `4c4b560` | Chore: track .env.example, gitignore other .env files |
-| `9797892` | Chore: initialize shadcn/ui with Tailwind v4 |
-| `3d74915` | Chore: add branching policy rule to AGENTS.md |
-| `d2d5821` | **Feat**: run and commit database migrations |
-| `da1efb8` | **Feat**: implement appointments module (book, list, cancel) |
-| `055608a` | **Feat**: implement prescriptions dashboard module |
-| `2a0b47a` | Chore: add Supabase storage env variable placeholders |
-| `7dd2092` | **Feat**: implement medical records module with Supabase Storage upload |
-| `9621053` | **Feat**: implement medication & clinical reminders CRUD |
-| `56aff84` | Docs: update README with status banner and future scope |
-| `62af70c` | **Security**: private bucket + RLS policies + service role key |
-| `d3941cc` | Docs: update README with live Vercel URL |
-| `2d7f6f2` | **Redesign**: complete landing page overhaul |
-
-
-### Phase 9: Genie Assist & File Upload
-- **Renamed** "AI Symptom Chat" to "Genie Assist" across the app (sidebar, dashboard, header, etc.).
-- **Database**: Added "attachmentUrl" to "ChatMessage" model and ran migrations.
-- **Storage**: Created a new private Supabase bucket "chat-attachments" with Row Level Security allowing authenticated users to insert/select their own folder.
-- **Backend**: Implemented "uploadChatAttachment" server action in "lib/actions/chat.ts" using NextAuth session validation, and temporarily elevated "serverActions.bodySizeLimit" to '10mb' in "next.config.ts". Also updated "app/api/chat/route.ts" to convert the file to base64 inline data and pass it to Gemini.
-- **Trade-offs**: Used a Server Action to proxy file uploads instead of pure client-to-Supabase REST, because NextAuth cannot mint valid Supabase JWTs easily, meaning RLS wouldn't work for purely client-side fetch calls without a complex presigned-URL flow. The Server Action respects the 5MB file size limit effectively.
+| Phase | Status | Summary |
+|---|---|---|
+| 1 | ✅ Complete | Foundation: Next.js, Prisma, Auth.js, landing page, base layout |
+| 2 | ✅ Complete | Patient portal: appointments, prescriptions, medical records (Supabase Storage), reminders |
+| 3 | ✅ Complete | Genie Assist chatbot: Gemini LLM, tool-calling, emergency detection, rate limiting |
+| 4 | ✅ Complete | Admin dashboard + user management, doctor notes (AES-256-GCM), Stripe payments |
+| 5 | ✅ Complete | Find Care: OpenStreetMap Nominatim + Overpass facility search |
+| 6 | ✅ Complete | Doctor dashboard: patient roster, prescriptions, settings, appointments management |
+| 7 | ✅ Complete | Patient dashboard home: metrics, quick actions, emergency contacts card, notification bell |
+| 8 | ✅ Complete | Emergency contacts CRUD, doctor application workflow, Google OAuth, tabbed login |
+| 9 | ✅ Complete | Genie Assist renamed (was "AI Symptom Chat"), chat file attachments via Supabase `chat-attachments` |
+| Performance | ✅ Applied | DB indexes migration, Promise.all parallelization, N+1 fix (getDoctorPatients distinct), history filtering |
+| Bug Fixes | ✅ Applied | doctorId hallucination prevention (system prompt rule + history filtering), date validation, idempotency, rate limiting on action endpoint |

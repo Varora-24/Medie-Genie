@@ -8,7 +8,8 @@ export async function getDoctors() {
   try {
     return await db.user.findMany({
       where: { role: 'doctor' },
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true, email: true, specialty: true },
+      orderBy: { name: 'asc' },
     })
   } catch (error) {
     console.error('Error fetching doctors:', error)

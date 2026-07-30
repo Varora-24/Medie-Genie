@@ -51,6 +51,11 @@ model Appointment {
   payments  Payment[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([status])
+  @@index([patientId, status])
 }
 
 model Prescription {
@@ -67,6 +72,9 @@ model Prescription {
   instructions String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([doctorId])
 }
 
 model MedicalRecord {
@@ -82,6 +90,9 @@ model MedicalRecord {
   recordDate  DateTime
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([doctorId])
 }
 
 model Reminder {
@@ -95,6 +106,10 @@ model Reminder {
   isCompleted  Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, isCompleted])
+  @@index([scheduleTime])
 }
 
 model ChatSession {
@@ -105,6 +120,8 @@ model ChatSession {
   messages  ChatMessage[]
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+
+  @@index([patientId])
 }
 
 model ChatMessage {
@@ -117,6 +134,9 @@ model ChatMessage {
   attachmentUrl String?
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
+
+  @@index([sessionId])
+  @@index([sessionId, createdAt])
 }
 
 model Payment {
@@ -132,6 +152,10 @@ model Payment {
   providerPaymentId String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+
+  @@index([patientId])
+  @@index([appointmentId])
+  @@index([status])
 }
 
 /// WARNING: The encryptedContent in DoctorNote is encrypted using AES-256-GCM. 
@@ -148,6 +172,9 @@ model DoctorNote {
   iv               String
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([doctorId])
 }
 
 model DoctorApplication {
@@ -165,6 +192,8 @@ model DoctorApplication {
   reviewedAt      DateTime?
   rejectionReason String?
   createdAt       DateTime @default(now())
+
+  @@index([status])
 }
 
 model EmergencyContact {
@@ -175,4 +204,6 @@ model EmergencyContact {
   relation  String
   phone     String
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
