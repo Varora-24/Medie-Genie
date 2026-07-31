@@ -131,6 +131,7 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
           message: trimmed || `[Attached file: ${fileToUpload?.name}]`,
           sessionId: activeSessionId || undefined,
           attachmentUrl: uploadedUrl,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         }),
       })
 
@@ -158,9 +159,9 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
         setSessions((prev) => [newSession, ...prev])
       }
 
-      // Add AI reply
+      // Add AI reply with the real DB ID if available, otherwise fallback
       const aiMsg: ChatMessage = {
-        id: `ai-${Date.now()}`,
+        id: data.messageId || `ai-${Date.now()}`,
         senderRole: 'AI',
         content: data.reply,
         flagged: data.flagged,
@@ -230,12 +231,12 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
               </h4>
               {parsed.name === 'create_reminder' && (
                 <p className="text-sm mb-4">
-                  I'll create a reminder for: <strong className="text-indigo-700">{parsed.args.title}</strong> on {new Date(parsed.args.dueDate).toLocaleString()}
+                  I'll create a reminder for: <strong className="text-indigo-700">{parsed.args.title}</strong> on {new Date(parsed.args.dueDate).toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                 </p>
               )}
               {parsed.name === 'book_appointment' && (
                 <p className="text-sm mb-4">
-                  I'll book an appointment on {new Date(parsed.args.dateTime).toLocaleString()} for "{parsed.args.reason}".
+                  I'll book an appointment on {new Date(parsed.args.dateTime).toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} for "{parsed.args.reason}".
                 </p>
               )}
               <div className="flex gap-3">

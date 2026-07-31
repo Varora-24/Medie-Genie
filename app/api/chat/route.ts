@@ -57,7 +57,8 @@ RULES YOU MUST FOLLOW:
 5. Be empathetic, clear, and concise. Use plain language, not medical jargon.
 6. If asked about topics outside of health/medical, politely redirect to health-related questions.
 7. You have access to tools to book appointments, create reminders, check available doctors, and get emergency contacts. Use them when appropriate.
-8. CRITICAL — BOOKING RULE: You MUST always call list_available_doctors first to get real doctor IDs from the system. NEVER invent, guess, or remember a doctorId from a previous session. Only use a doctorId that was returned by list_available_doctors in the current conversation. If you do not have a doctorId from list_available_doctors in this conversation, call that tool first before proposing any booking.`
+8. CRITICAL — BOOKING RULE 1: You MUST always call list_available_doctors first to get real doctor IDs from the system. NEVER invent, guess, or remember a doctorId from a previous session. Only use a doctorId that was returned by list_available_doctors in the current conversation. If you do not have a doctorId from list_available_doctors in this conversation, call that tool first before proposing any booking.
+9. CRITICAL — BOOKING RULE 2: If the user requests an appointment, but does not explicitly provide the specific DATE, TIME, and REASON for the appointment, you MUST ask the user for the missing information BEFORE calling the book_appointment tool. Do not guess or use placeholders like 'Not specified'.`
 
 // ── Tool Declarations ────────────────────────────────────────────────
 const createReminderDecl: FunctionDeclaration = {
@@ -93,7 +94,7 @@ const bookAppointmentDecl: FunctionDeclaration = {
     properties: {
       doctorId: { type: SchemaType.STRING, description: 'ID of the doctor to book with.' },
       dateTime: { type: SchemaType.STRING, description: 'ISO 8601 string of the appointment date and time.' },
-      reason: { type: SchemaType.STRING, description: 'Reason for the appointment.' },
+      reason: { type: SchemaType.STRING, description: 'Explicit reason for the appointment provided by the user. Do not use placeholders.' },
     },
     required: ['doctorId', 'dateTime', 'reason'],
   }
@@ -138,11 +139,14 @@ export async function POST(req: NextRequest) {
   let message: string
   let sessionId: string | undefined
   let attachmentUrl: string | undefined
+  let timezone: string = 'UTC'
+
   try {
     const body = await req.json()
     message = body.message
     sessionId = body.sessionId
     attachmentUrl = body.attachmentUrl
+    if (body.timezone) timezone = body.timezone
   } catch {
     return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
   }
@@ -243,7 +247,7 @@ export async function POST(req: NextRequest) {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
     const model = genAI.getGenerativeModel({
       model: 'gemini-3.1-flash-lite',
-      systemInstruction: SYSTEM_PROMPT + `\n\nCURRENT SERVER TIME: ${new Date().toISOString()}\nUse this time as the reference for any relative dates like "tomorrow" or "next week".`,
+      systemInstruction: SYSTEM_PROMPT + `\n\nCURRENT SERVER TIME: ${new Date().toISOString()}\nUSER TIMEZONE: ${timezone}\nIMPORTANT: For any dateTime tool parameters, you MUST output the ISO string WITH the user's correct timezone offset (e.g. +05:30) so it matches their local time accurately. Never output 'Z' (UTC) unless the user is actually in UTC.`,
       tools: [{
         functionDeclarations: [
           createReminderDecl,
@@ -390,7 +394,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Save AI response
-    await db.chatMessage.create({
+    const aiMessage = await db.chatMessage.create({
       data: {
         sessionId: chatSessionId,
         senderRole: 'AI',
@@ -408,7 +412,8 @@ export async function POST(req: NextRequest) {
       reply: aiReplyText,
       sessionId: chatSessionId,
       flagged,
-      isPendingTool
+      isPendingTool,
+      messageId: aiMessage.id
     })
   } catch (error: any) {
     console.error('Chat route error:', error)
