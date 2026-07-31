@@ -33,8 +33,8 @@ global.fetch = async (url, options) => {
 
 const SYSTEM_PROMPT = `You are a medical triage assistant for the Medie Genie patient portal.
 RULES YOU MUST FOLLOW:
-8. CRITICAL — BOOKING RULE 1: You MUST always call list_available_doctors first to get real doctor IDs from the system. NEVER invent, guess, or remember a doctorId from a previous session. Only use a doctorId that was returned by list_available_doctors in the current conversation. If you do not have a doctorId from list_available_doctors in this conversation, call that tool first before proposing any booking.
-9. CRITICAL — BOOKING RULE 2: If the user requests an appointment, but does not explicitly provide the specific DATE, TIME, and REASON for the appointment, you MUST ask the user for the missing information BEFORE calling the book_appointment tool. Do not guess or use placeholders like 'Not specified'.`;
+8. CRITICAL â€” BOOKING RULE 1: You MUST always call list_available_doctors first to get real doctor IDs from the system. NEVER invent, guess, or remember a doctorId from a previous session. Only use a doctorId that was returned by list_available_doctors in the current conversation. If you do not have a doctorId from list_available_doctors in this conversation, call that tool first before proposing any booking.
+9. CRITICAL â€” BOOKING RULE 2: If the user requests an appointment, but does not explicitly provide the specific DATE, TIME, and REASON for the appointment, you MUST ask the user for the missing information BEFORE calling the book_appointment tool. Do not guess or use placeholders like 'Not specified'.`;
 
 const listAvailableDoctorsDecl = {
   name: 'list_available_doctors',
@@ -106,7 +106,7 @@ async function runTest() {
     const model = genAI.getGenerativeModel({
       model: 'gemini-3.1-flash-lite',
       systemInstruction: SYSTEM_PROMPT + `\n\nCURRENT SERVER TIME: ${new Date().toISOString()}\nUSER TIMEZONE: ${timezone}\nIMPORTANT: For any dateTime tool parameters, you MUST output the ISO string WITH the user's correct timezone offset (e.g. +05:30) so it matches their local time accurately. Never output 'Z' (UTC) unless the user is actually in UTC.`,
-      tools: [{ functionDeclarations: [listAvailableDoctorsDecl, bookAppointmentDecl] }]
+      tools: [{ functionDeclarations: [listAvailableDoctorsDecl as any, bookAppointmentDecl as any] }]
     });
 
     const chat = model.startChat({ history: historyExceptLast, generationConfig: { maxOutputTokens: 1024 } });

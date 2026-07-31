@@ -56,9 +56,10 @@ RULES YOU MUST FOLLOW:
    When any emergency symptom is detected, begin your response with EXACTLY: "⚠️ EMERGENCY: Based on what you've described, please seek emergency medical care immediately. Call your local emergency services (e.g. 911) right now."
 5. Be empathetic, clear, and concise. Use plain language, not medical jargon.
 6. If asked about topics outside of health/medical, politely redirect to health-related questions.
-7. You have access to tools to book appointments, create reminders, check available doctors, and get emergency contacts. Use them when appropriate.
+7. You have access to tools to book appointments, schedule lab tests (pathology/radiology), create reminders, check available doctors, check available lab services, and get emergency contacts. Use them when appropriate.
 8. CRITICAL — BOOKING RULE 1: You MUST always call list_available_doctors first to get real doctor IDs from the system. NEVER invent, guess, or remember a doctorId from a previous session. Only use a doctorId that was returned by list_available_doctors in the current conversation. If you do not have a doctorId from list_available_doctors in this conversation, call that tool first before proposing any booking.
-9. CRITICAL — BOOKING RULE 2: If the user requests an appointment, but does not explicitly provide the specific DATE, TIME, and REASON for the appointment, you MUST ask the user for the missing information BEFORE calling the book_appointment tool. Do not guess or use placeholders like 'Not specified'.`
+9. CRITICAL — BOOKING RULE 2: If the user requests an appointment, but does not explicitly provide the specific DATE, TIME, and REASON for the appointment, you MUST ask the user for the missing information BEFORE calling the book_appointment tool. Do not guess or use placeholders like 'Not specified'.
+10. CRITICAL — LAB BOOKING RULE: Before scheduling a lab service, call list_lab_services first to obtain real service IDs and see whether HOME collection or LAB walk-in is supported. Ask for preferred date/time and visitType (and address if HOME) before proposing a schedule_lab_service call.`
 
 // ── Tool Declarations ────────────────────────────────────────────────
 const createReminderDecl: FunctionDeclaration = {
@@ -118,6 +119,34 @@ const findNearbyCareDecl: FunctionDeclaration = {
       facilityType: { type: SchemaType.STRING, description: 'Type of facility to find (e.g. hospital, clinic, pharmacy). Defaults to hospital.' },
       address: { type: SchemaType.STRING, description: 'Address or location name to search near. If missing, defaults to a test location.' }
     }
+  }
+}
+
+const listLabServicesDecl: FunctionDeclaration = {
+  name: 'list_lab_services',
+  description: 'Queries available diagnostic lab tests and imaging services, optionally filtered by category (e.g. Hematology, Radiology).',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      category: { type: SchemaType.STRING, description: 'Optional medical specialty/category filter.' },
+    }
+  }
+}
+
+const scheduleLabServiceDecl: FunctionDeclaration = {
+  name: 'schedule_lab_service',
+  description: 'Proposes scheduling a pathology test or imaging scan for the patient. Requires user confirmation.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      serviceId: { type: SchemaType.STRING, description: 'Real database CUID of the lab service.' },
+      serviceName: { type: SchemaType.STRING, description: 'Name of the lab test or scan being booked.' },
+      visitType: { type: SchemaType.STRING, description: 'Either HOME or LAB.' },
+      address: { type: SchemaType.STRING, description: 'Home sample collection address if visitType is HOME.' },
+      scheduledAt: { type: SchemaType.STRING, description: 'ISO 8601 string representing the appointment date and time.' },
+      notes: { type: SchemaType.STRING, description: 'Optional patient instructions or fasting notes.' },
+    },
+    required: ['serviceId', 'serviceName', 'visitType', 'scheduledAt'],
   }
 }
 
@@ -211,6 +240,13 @@ export async function POST(req: NextRequest) {
               parts: [{ text: `I found these available doctors:\n${doctorLines}\n\nIMPORTANT: Use ONLY these exact IDs when booking.` }]
             }
           }
+          if (parsed.type === 'LAB_LIST_RESULT') {
+            const labLines = parsed.services.map((s: any) => `- ${s.name} (ID: ${s.id}, Category: ${s.category}, Home: ${s.homeVisitAvailable}, Lab: ${s.labVisitAvailable})`).join('\n')
+            return {
+              role: 'model' as const,
+              parts: [{ text: `I found these available lab and diagnostic tests:\n${labLines}\n\nIMPORTANT: Use ONLY these exact IDs when calling schedule_lab_service.` }]
+            }
+          }
         } catch { /* Not JSON */ }
         return {
           role: msg.senderRole === 'PATIENT' ? 'user' as const : 'model' as const,
@@ -254,7 +290,9 @@ export async function POST(req: NextRequest) {
           listAvailableDoctorsDecl,
           bookAppointmentDecl,
           getEmergencyContactsDecl,
-          findNearbyCareDecl
+          findNearbyCareDecl,
+          listLabServicesDecl,
+          scheduleLabServiceDecl
         ]
       }]
     })
@@ -310,8 +348,30 @@ export async function POST(req: NextRequest) {
           const toolResult = await chat.sendMessage([{ functionResponse: { name: call.name, response: { note: `Please use the UI Find Care button to find a ${type}` } } }])
           aiReplyText = toolResult.response.text()
         }
+        else if (call.name === 'list_lab_services') {
+          const category = (call.args as any).category
+          const whereClause: any = {}
+          if (category && category !== 'All') {
+            whereClause.category = { contains: category, mode: 'insensitive' }
+          }
+          const services = await db.labService.findMany({
+            where: whereClause,
+            select: { id: true, name: true, category: true, homeVisitAvailable: true, labVisitAvailable: true },
+            orderBy: { name: 'asc' }
+          })
+          await db.chatMessage.create({
+            data: {
+              sessionId: chatSessionId,
+              senderRole: 'AI',
+              content: JSON.stringify({ type: 'LAB_LIST_RESULT', services }),
+              flagged: false,
+            }
+          })
+          const toolResult = await chat.sendMessage([{ functionResponse: { name: call.name, response: { services } } }])
+          aiReplyText = toolResult.response.text()
+        }
         // Handle mutation tools (require confirmation)
-        else if (call.name === 'create_reminder' || call.name === 'book_appointment') {
+        else if (call.name === 'create_reminder' || call.name === 'book_appointment' || call.name === 'schedule_lab_service') {
           let errorMsg = null;
           if (call.name === 'create_reminder') {
             const dueDate = new Date((call.args as any).dueDate);
@@ -360,6 +420,17 @@ export async function POST(req: NextRequest) {
               } else if (doctor.role !== 'doctor') {
                 errorMsg = `I couldn't book the appointment because "${doctor.name}" is not registered as a doctor. Please choose from the available doctors list.`;
                 console.log('[book_appointment] FAIL: user found but role is', doctor.role, 'not doctor')
+              }
+            }
+          } else if (call.name === 'schedule_lab_service') {
+            const scheduledAt = new Date((call.args as any).scheduledAt);
+            const serviceId = (call.args as any).serviceId;
+            if (isNaN(scheduledAt.getTime()) || scheduledAt < new Date()) {
+              errorMsg = "I couldn't propose this test booking because the specified date is in the past or invalid. Please provide a future date.";
+            } else {
+              const service = await db.labService.findUnique({ where: { id: serviceId } });
+              if (!service) {
+                errorMsg = `I couldn't find lab service ID "${serviceId}". Please let me list available tests first!`;
               }
             }
           }

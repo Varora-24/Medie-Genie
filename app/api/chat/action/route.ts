@@ -104,6 +104,28 @@ export async function POST(req: NextRequest) {
         }
       })
       resultMessage = 'Successfully booked the appointment.'
+    } else if (toolName === 'schedule_lab_service') {
+      const { serviceId, visitType, address, scheduledAt, notes } = args
+      const parsedDate = new Date(scheduledAt)
+      if (isNaN(parsedDate.getTime()) || parsedDate < new Date()) {
+         return NextResponse.json({ error: 'The requested date is in the past or invalid. Please request a future date.' }, { status: 400 })
+      }
+      const service = await db.labService.findUnique({ where: { id: serviceId } })
+      if (!service) {
+         return NextResponse.json({ error: 'Lab test not found in our diagnostic catalog.' }, { status: 404 })
+      }
+      await db.labBooking.create({
+        data: {
+          patientId: userId,
+          serviceId,
+          visitType: visitType || 'HOME',
+          address: address || null,
+          scheduledAt: parsedDate,
+          notes: notes || null,
+          status: 'CONFIRMED'
+        }
+      })
+      resultMessage = 'Successfully scheduled the diagnostic lab service.'
     } else {
       return NextResponse.json({ error: 'Invalid tool name' }, { status: 400 })
     }

@@ -46,6 +46,7 @@ export default async function DashboardPage() {
   let recentRecords: any[] = []
   let dueReminders: any[] = []
   let emergencyContacts: any[] = []
+  let labBookings: any[] = []
 
   if (role === 'doctor') {
     ;[appointments, patients] = await Promise.all([
@@ -53,7 +54,7 @@ export default async function DashboardPage() {
       getDoctorPatients(),
     ])
   } else if (role === 'patient') {
-    ;[appointments, activePrescriptions, recentRecords, dueReminders, emergencyContacts] = await Promise.all([
+    ;[appointments, activePrescriptions, recentRecords, dueReminders, emergencyContacts, labBookings] = await Promise.all([
       db.appointment.findMany({
         where: { patientId: userId },
         include: { doctor: { select: { name: true, specialty: true } } },
@@ -78,6 +79,12 @@ export default async function DashboardPage() {
       db.emergencyContact.findMany({
         where: { userId },
         take: 5,
+      }),
+      db.labBooking.findMany({
+        where: { patientId: userId, scheduledAt: { gte: new Date() } },
+        include: { service: true },
+        orderBy: { scheduledAt: 'asc' },
+        take: 3,
       }),
     ])
   }
@@ -269,6 +276,42 @@ export default async function DashboardPage() {
                     <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto mb-2 opacity-50" />
                     <h4 className="font-semibold text-slate-600 mb-1">All Caught Up!</h4>
                     <p className="text-xs text-slate-500 max-w-sm mx-auto">No pending reminders right now.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Upcoming Lab Bookings Section */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-indigo-600" />
+                    Upcoming Lab & Diagnostic Tests
+                  </h3>
+                  <Link href="/dashboard/lab-services" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                    Manage / Book New
+                  </Link>
+                </div>
+                {labBookings.length > 0 ? (
+                  <ul className="divide-y divide-slate-100">
+                    {labBookings.map((lb: any) => (
+                      <li key={lb.id} className="py-3 flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-semibold text-slate-800">{lb.service.name}</p>
+                          <p className="text-xs text-slate-500">
+                            {new Date(lb.scheduledAt).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} • {lb.visitType === 'HOME' ? `Home Collection (${lb.address || 'Home'})` : 'Lab Walk-in'}
+                          </p>
+                        </div>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          {lb.status}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="border border-dashed border-slate-200 rounded-xl p-6 text-center bg-slate-50">
+                    <CheckCircle2 className="h-8 w-8 text-slate-300 mx-auto mb-2 opacity-50" />
+                    <h4 className="font-semibold text-slate-600 mb-1">No Upcoming Diagnostics</h4>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">Need a blood test or scan? Schedule one from our pathology portal.</p>
                   </div>
                 )}
               </div>

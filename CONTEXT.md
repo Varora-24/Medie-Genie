@@ -61,6 +61,8 @@ Medie-Genie/
 │   │   ├── doctor-applications/        # Admin: review/approve/reject doctor applications
 │   │   ├── emergency-contacts/         # Patient: add/edit/delete emergency contacts
 │   │   ├── find-care/                  # OpenStreetMap facility search
+│   │   ├── lab-services/               # Patient: browse diagnostic test catalog & schedule home/lab visits
+│   │   ├── manage-labs/                # Admin: manage diagnostic service catalog & oversee lab bookings
 │   │   ├── patients/                   # Doctor: patient roster
 │   │   ├── patients/[patientId]/       # Doctor: per-patient notes (AES-256-GCM) + prescription form
 │   │   ├── prescriptions/              # Patient/Doctor: prescriptions list
@@ -82,6 +84,7 @@ Medie-Genie/
 │   │   ├── appointments.ts             # getDoctors, getAppointments, bookAppointment, cancelAppointment, updateAppointmentStatus
 │   │   ├── chat.ts                     # uploadChatAttachment (Supabase Storage for chat)
 │   │   ├── emergency-contacts.ts       # CRUD for EmergencyContact model
+│   │   ├── lab-actions.ts              # CRUD for LabService and LabBooking models (patient & admin actions)
 │   │   ├── notes.ts                    # getDoctorPatients, getPatientNotes, addDoctorNote (AES-256-GCM)
 │   │   ├── prescriptions.ts            # getPrescriptions, addPrescription
 │   │   ├── records.ts                  # getMedicalRecords, uploadMedicalRecord
@@ -92,10 +95,13 @@ Medie-Genie/
 │   ├── encryption.ts                   # AES-256-GCM encryptNote / decryptNote using ENCRYPTION_KEY env var
 │   └── utils.ts
 ├── prisma/
-│   ├── schema.prisma                   # 10 models (see §4 below)
-│   ├── migrations/                     # 9 applied migrations (latest: add_performance_indexes)
+│   ├── schema.prisma                   # 12 models (see §4 below)
+│   ├── migrations/                     # applied migrations (latest: add_performance_indexes)
 │   └── seed.js                         # Seeds admin account with random password (logged to console, not committed)
 ├── public/mockups/                     # UI mockup images for landing page
+├── scripts/
+│   ├── seed-lab-services.ts            # Script to populate initial diagnostic test catalog in DB
+│   └── test-booking-e2e.ts             # PERMANENT regression test suite for Genie Assist scheduling & tool-calling flow
 ├── auth.ts                             # NextAuth config (Credentials + Google providers)
 ├── auth.config.ts                      # JWT/session callbacks injecting role+id; route guards
 ├── middleware.ts                       # NextAuth edge middleware for route protection
@@ -107,7 +113,7 @@ Medie-Genie/
 
 ---
 
-## 4. Database Schema (10 Models)
+## 4. Database Schema (12 Models)
 
 | Model | Purpose | Key Indexes |
 |---|---|---|
@@ -122,6 +128,8 @@ Medie-Genie/
 | `DoctorNote` | Clinical notes. `encryptedContent` + `iv` stored (AES-256-GCM via `ENCRYPTION_KEY` env var). **If ENCRYPTION_KEY is lost, all existing notes are permanently unreadable.** | `[patientId]`, `[doctorId]` |
 | `DoctorApplication` | Public doctor application submissions reviewed by admin | `[status]` |
 | `EmergencyContact` | Up to 5 contacts per patient. Shown on dashboard + in Genie Assist emergency responses | `[userId]` |
+| `LabService` | Catalog of diagnostic pathology tests and scans with availability toggles | `[category]` |
+| `LabBooking` | Patient bookings for diagnostic tests (Home sample collection or direct lab visit) | `[patientId]`, `[serviceId]`, `[scheduledAt]` |
 
 **Supabase Project**: `huednspoofanbpkiumvf` (ap-southeast-2). Pooled via port 6543 (`DATABASE_URL`), direct on port 5432 (`DIRECT_URL` for migrations).
 
@@ -171,6 +179,9 @@ Medie-Genie/
 - Hard server-side date validation rejects past dates before showing confirmation card.
 - Idempotency: double-confirming a card returns 400 "already processed."
 - Rate limiting: 15 req/min on BOTH `/api/chat` AND `/api/chat/action`.
+- **Lab Services Tool-Calling**: Integrated `list_lab_services` and `schedule_lab_service` function tools with pre-validation and interactive confirmation cards in chat UI.
+
+> **CRITICAL — MANDATORY REGRESSION TEST SUITE**: A permanent end-to-end simulation test script is stored at `scripts/test-booking-e2e.ts`. After **ANY** future modifications or refactoring to the chat tool-calling, natural language time/date logic, or booking workflows, you **MUST** execute this test suite (`npx tsx scripts/test-booking-e2e.ts`) to confirm zero regressions before committing code.
 
 ---
 
@@ -236,5 +247,6 @@ Medie-Genie/
 | 7 | ✅ Complete | Patient dashboard home: metrics, quick actions, emergency contacts card, notification bell |
 | 8 | ✅ Complete | Emergency contacts CRUD, doctor application workflow, Google OAuth, tabbed login |
 | 9 | ✅ Complete | Genie Assist renamed (was "AI Symptom Chat"), chat file attachments via Supabase `chat-attachments` |
+| 10 | ✅ Complete | Pathology & Diagnostic Lab Service Scheduling (catalog, home sample collection vs lab visit, admin oversight, and Genie Assist conversational scheduling tools) |
 | Performance | ✅ Applied | DB indexes migration, Promise.all parallelization, N+1 fix (getDoctorPatients distinct), history filtering |
-| Bug Fixes | ✅ Applied | doctorId hallucination prevention (system prompt rule + DOCTOR_LIST_RESULT DB persistence + history filtering), date validation, idempotency, rate limiting, and fixed 5XX crash on dashboard from null session race conditions |
+| Bug Fixes | ✅ Applied | doctorId hallucination prevention (system prompt rule + DOCTOR_LIST_RESULT/LAB_LIST_RESULT DB persistence + history filtering), timezone-aware natural language date parsing, unambiguous date UI display globally, idempotency, rate limiting, and fixed 5XX crash on dashboard from null session race conditions |

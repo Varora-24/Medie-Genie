@@ -239,6 +239,11 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
                   I'll book an appointment on {new Date(parsed.args.dateTime).toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} for "{parsed.args.reason}".
                 </p>
               )}
+              {parsed.name === 'schedule_lab_service' && (
+                <p className="text-sm mb-4">
+                  I'll schedule a <strong className="text-indigo-700">{parsed.args.serviceName}</strong> ({parsed.args.visitType === 'HOME' ? `Home Collection at ${parsed.args.address}` : 'Lab Walk-in'}) for {new Date(parsed.args.scheduledAt).toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}.
+                </p>
+              )}
               <div className="flex gap-3">
                 <button
                   onClick={() => handleConfirmTool(msg.id, activeSessionId as string, parsed.name, parsed.args)}
@@ -264,7 +269,7 @@ export default function ChatInterface({ initialSessions, emergencyContacts = [] 
                 <span className="text-emerald-600 font-bold text-xs">✓</span>
               </div>
               <p className="text-sm font-medium text-emerald-800">
-                {parsed.name === 'create_reminder' ? 'Reminder created successfully.' : 'Appointment booked successfully.'}
+                {parsed.name === 'create_reminder' ? 'Reminder created successfully.' : parsed.name === 'schedule_lab_service' ? 'Lab test scheduled successfully.' : 'Appointment booked successfully.'}
               </p>
             </div>
           )

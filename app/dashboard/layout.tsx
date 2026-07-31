@@ -14,7 +14,8 @@ import {
   Settings,
   LogOut,
   User,
-  CreditCard
+  CreditCard,
+  Activity
 } from 'lucide-react'
 import NotificationBell from '@/components/notification-bell'
 
@@ -40,6 +41,7 @@ export default async function DashboardLayout({
         return [
           { name: 'Console Logs', href: '/dashboard', icon: LayoutDashboard },
           { name: 'User Directory', href: '/dashboard/users', icon: Users },
+          { name: 'Lab Management', href: '/dashboard/manage-labs', icon: Activity },
           { name: 'Financials', href: '/dashboard/payments', icon: CreditCard },
           { name: 'Account Settings', href: '/dashboard/profile', icon: Settings },
         ]
@@ -58,6 +60,7 @@ export default async function DashboardLayout({
           { name: 'My Prescriptions', href: '/dashboard/prescriptions', icon: FileSpreadsheet },
           { name: 'Medical History', href: '/dashboard/records', icon: Users },
           { name: 'Genie Assist', href: '/dashboard/chat', icon: Bot },
+          { name: 'Pathology & Labs', href: '/dashboard/lab-services', icon: Activity },
           { name: 'Meds Reminders', href: '/dashboard/reminders', icon: Bell },
         ]
     }
